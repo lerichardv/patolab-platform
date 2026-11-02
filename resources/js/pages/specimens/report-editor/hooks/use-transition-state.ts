@@ -61,6 +61,17 @@ export function useTransitionState({
                         }
 
                         setSessionEditingEnabled(false);
+
+                        if (typeof window !== 'undefined') {
+                            try {
+                                window.localStorage.setItem(
+                                    'patolab_specimens_updated_at',
+                                    Date.now().toString(),
+                                );
+                            } catch {
+                                // Ignore storage quota errors
+                            }
+                        }
                     },
                     onError: (errors) => {
                         if (errors && errors.error) {

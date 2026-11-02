@@ -234,7 +234,8 @@ class Specimen extends Model
 
     public function getExpectedFinalizationDateAttribute(): ?Carbon
     {
-        if (! $this->created_at) {
+        $baseDate = $this->received_at ?? $this->created_at;
+        if (! $baseDate) {
             return null;
         }
 
@@ -242,6 +243,11 @@ class Specimen extends Model
             $unit = $this->delivery_date_unit;
             $quantity = $this->delivery_date_quantity;
         } else {
+            if ($this->relationLoaded('category') && $this->category && ! array_key_exists('unit', $this->category->getAttributes())) {
+                $this->unsetRelation('category');
+                $this->load('category');
+            }
+
             if (! $this->category || ! $this->category->unit || ! $this->category->quantity) {
                 return null;
             }
@@ -254,7 +260,7 @@ class Specimen extends Model
             return null;
         }
 
-        $createdAt = Carbon::parse($this->created_at);
+        $createdAt = Carbon::parse($baseDate);
 
         switch ($unit) {
             case 'minutes':
@@ -285,7 +291,8 @@ class Specimen extends Model
 
     public function getExpectedInternalFinalizationDateAttribute(): ?Carbon
     {
-        if (! $this->created_at) {
+        $baseDate = $this->received_at ?? $this->created_at;
+        if (! $baseDate) {
             return null;
         }
 
@@ -293,6 +300,11 @@ class Specimen extends Model
             $unit = $this->delivery_date_intern_unit;
             $quantity = $this->delivery_date_intern_quantity;
         } else {
+            if ($this->relationLoaded('category') && $this->category && ! array_key_exists('intern_unit', $this->category->getAttributes())) {
+                $this->unsetRelation('category');
+                $this->load('category');
+            }
+
             if (! $this->category || ! $this->category->intern_unit || ! $this->category->intern_quantity) {
                 return null;
             }
@@ -305,7 +317,7 @@ class Specimen extends Model
             return null;
         }
 
-        $createdAt = Carbon::parse($this->created_at);
+        $createdAt = Carbon::parse($baseDate);
 
         switch ($unit) {
             case 'minutes':

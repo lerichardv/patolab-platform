@@ -144,6 +144,10 @@ export default function SpecimenGroupForm({
     banks = [],
 }: Props) {
     const { props: pageProps } = usePage<any>();
+    const canManageStatus = Boolean(
+        pageProps.auth?.user?.role?.slug === 'admin' ||
+        pageProps.auth?.permissions?.includes('specimens.manage_status'),
+    );
     const { settings } = pageProps;
     const flash = pageProps.flash as Record<string, any> | undefined;
     const thirdAgePercent = parseFloat(settings?.third_age_discount || '30');
@@ -3808,10 +3812,16 @@ export default function SpecimenGroupForm({
                                                                                 b.step_order,
                                                                         );
 
-                                                                    setNestedStatus(
-                                                                        sorted[0]
-                                                                            .status,
-                                                                    );
+                                                                    if (
+                                                                        !nestedSpecimenToEditId &&
+                                                                        sorted.length >
+                                                                            0
+                                                                    ) {
+                                                                        setNestedStatus(
+                                                                            sorted[0]
+                                                                                .status,
+                                                                        );
+                                                                    }
                                                                 }
 
                                                                 setNestedReservedCode(
@@ -4605,6 +4615,7 @@ export default function SpecimenGroupForm({
                                             status: '',
                                         }));
                                     }}
+                                    disabled={!canManageStatus}
                                     options={nestedAvailableStatuses.map(
                                         (s, idx) => ({
                                             label: s.label,
@@ -4612,10 +4623,18 @@ export default function SpecimenGroupForm({
                                             color: s.color,
                                             disabled: !nestedSpecimenToEditId
                                                 ? idx !== 0
-                                                : nestedStatus !== s.value,
+                                                : !canManageStatus
+                                                  ? nestedStatus !== s.value
+                                                  : false,
                                         }),
                                     )}
                                 />
+                                {!canManageStatus && (
+                                    <p className="text-xs text-muted-foreground">
+                                        El estado solo puede ser modificado por
+                                        roles autorizados.
+                                    </p>
+                                )}
                                 {nestedErrors.status && (
                                     <p className="text-xs text-destructive">
                                         {nestedErrors.status}

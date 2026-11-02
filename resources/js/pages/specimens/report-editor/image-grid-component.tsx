@@ -2,1526 +2,1605 @@ import type { DropResult } from '@hello-pangea/dnd';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/react';
 import {
-    LayoutGrid,
-    Plus,
-    Trash2,
-    Settings2,
-    Columns,
-    Image as ImageIcon,
-    X,
-    Crop,
-    GripVertical,
+	LayoutGrid,
+	Plus,
+	Trash2,
+	Settings2,
+	Columns,
+	Image as ImageIcon,
+	X,
+	Crop,
+	GripVertical,
 } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-    DialogFooter,
-    DialogClose,
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+	DialogFooter,
+	DialogClose,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { uploadImageToEndpoint } from './actions';
 
 interface ImageGridProps {
-    editor: any;
-    node: any;
-    getPos: () => number | undefined;
-    updateAttributes: (attrs: any) => void;
+	editor: any;
+	node: any;
+	getPos: () => number | undefined;
+	updateAttributes: (attrs: any) => void;
 }
 
 export default function ImageGridComponent({
-    editor,
-    node,
-    getPos,
-    updateAttributes,
+	editor,
+	node,
+	getPos,
+	updateAttributes,
 }: ImageGridProps) {
-    const columns = node.attrs.columns || 2;
-    const align = node.attrs.alignment || 'center';
-    const width = node.attrs.width;
-    const isEditable = editor.isEditable;
-
-    // Fetch the specimenSequenceCode from the extension options
-    const extOptions = editor.extensionManager.extensions.find(
-        (ext: any) => ext.name === 'imageGrid',
-    )?.options;
-    const specimenSequenceCode = extOptions?.specimenSequenceCode || '';
-
-    // Helper to get upload URL across reports, templates, and delivery notes
-    const getUploadUrl = () => {
-        if (extOptions?.uploadUrl) {
-            return extOptions.uploadUrl;
-        }
-
-        if (specimenSequenceCode) {
-            return `/specimens/${specimenSequenceCode}/report-editor/upload-image`;
-        }
-
-        if (typeof window !== 'undefined') {
-            const pathname = window.location.pathname;
-            const workOrderMatch = pathname.match(/\/work-orders\/(\d+)/);
-
-            if (workOrderMatch) {
-                return `/work-orders/${workOrderMatch[1]}/delivery-note/upload-image`;
-            }
-
-            if (pathname.includes('/my-specimen-type-templates')) {
-                return `/my-specimen-type-templates/upload-image`;
-            }
-        }
-
-        return `/specimen-type-templates/upload-image`;
-    };
-
-    // Collect current images reactively
-    const currentImages: Array<{
-        src: string;
-        caption: string;
-        order?: number | null;
-        offset: number;
-        nodeSize: number;
-        childNode: any;
-    }> = [];
-    node.content.forEach((childNode: any, offset: number) => {
-        if (childNode.type.name === 'image') {
-            currentImages.push({
-                src: childNode.attrs.src,
-                caption: childNode.attrs.caption || '',
-                order: childNode.attrs.order ?? null,
-                offset,
-                nodeSize: childNode.nodeSize,
-                childNode,
-            });
-        }
-    });
-
-    const imagesSrcString = currentImages
-        .map((img, idx) => `${img.src}_${img.caption}_${img.order ?? idx}`)
-        .join(',');
-
-    const handleDragEnd = (result: DropResult) => {
-        if (
-            !result.destination ||
-            result.destination.index === result.source.index
-        ) {
-            return;
-        }
-
-        const pos = getPos();
-
-        if (pos === undefined) {
-            return;
-        }
-
-        const items = [...currentImages];
-        const [moved] = items.splice(result.source.index, 1);
-        items.splice(result.destination.index, 0, moved);
-
-        // Recreate child nodes in new order with updated order attributes (1-based)
-        const newNodes = items.map((item, idx) => {
-            return editor.schema.nodes.image.create({
-                ...item.childNode.attrs,
-                order: idx + 1,
-            });
-        });
-
-        const from = pos + 1;
-        const to = pos + node.nodeSize - 1;
-
-        editor
-            .chain()
-            .focus()
-            .command(({ tr }: any) => {
-                tr.replaceWith(from, to, newNodes);
-
-                return true;
-            })
-            .run();
-
-        toast.success('Imágenes reordenadas');
-    };
-
-    const handleUpdateImageCaption = (offset: number, caption: string) => {
-        const pos = getPos();
-
-        if (pos !== undefined) {
-            const targetPos = pos + 1 + offset;
-            const child = editor.state.tr.doc.nodeAt(targetPos);
-
-            if (child) {
-                editor.view.dispatch(
-                    editor.state.tr.setNodeMarkup(targetPos, undefined, {
-                        ...child.attrs,
-                        caption,
-                    }),
-                );
-            }
-        }
-    };
-
-    const [isOpen, setIsOpen] = useState(false);
-    const [croppingImage, setCroppingImage] = useState<{
-        src: string;
-        offset: number;
-        nodeSize: number;
-    } | null>(null);
-
-    const [isResizing, setIsResizing] = useState(false);
-    const [resizeWidth, setResizeWidth] = useState<number | null>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const lastWidthRef = useRef<number | null>(null);
-
-    useEffect(() => {
-        if (!containerRef.current) {
-            return;
-        }
-
-        const getTargetContainer = () => {
-            if (!containerRef.current) {
-                return null;
-            }
-
-            const contentEl = (containerRef.current.querySelector(
-                '[data-node-view-content]',
-            ) || containerRef.current.querySelector('.w-full')) as HTMLElement;
-
-            if (!contentEl) {
-                return null;
-            }
-
-            return (contentEl.querySelector('[data-node-view-content-react]') ||
-                contentEl) as HTMLElement;
-        };
-
-        const updateLayout = () => {
-            const targetContainer = getTargetContainer();
-
-            if (!targetContainer) {
-                return;
-            }
-
-            // Apply flex layout to content container
-            targetContainer.style.display = 'flex';
-            targetContainer.style.flexWrap = 'nowrap';
-            targetContainer.style.gap = '12px';
-            targetContainer.style.justifyContent = 'flex-start';
-            targetContainer.style.width = '100%';
-
-            const contentEl = (containerRef.current?.querySelector(
-                '[data-node-view-content]',
-            ) || containerRef.current?.querySelector('.w-full')) as HTMLElement;
-
-            if (contentEl && targetContainer !== contentEl) {
-                contentEl.style.display = 'flex';
-                contentEl.style.width = '100%';
-            }
-
-            const containerWidth =
-                targetContainer.getBoundingClientRect().width ||
-                contentEl?.getBoundingClientRect().width ||
-                width ||
-                600;
-            const children = Array.from(
-                targetContainer.children,
-            ) as HTMLElement[];
-
-            if (children.length === 0) {
-                return;
-            }
-
-            // Get image details (element and aspect ratio)
-            const imgItems = children.map((child) => {
-                let img: HTMLImageElement | null = null;
-
-                if (child.tagName.toLowerCase() === 'img') {
-                    img = child as HTMLImageElement;
-                } else {
-                    img = child.querySelector('img');
-                }
-
-                const aspect =
-                    img && img.naturalWidth > 0 && img.naturalHeight > 0
-                        ? img.naturalHeight / img.naturalWidth
-                        : 1.0;
-
-                return { child, img, aspect };
-            });
-
-            // Group into exactly one row of up to 4 images
-            const slicedImgItems = imgItems.slice(0, 4);
-            const rows = [slicedImgItems];
-
-            // Hide any extra images beyond 4
-            imgItems.forEach((item, idx) => {
-                if (idx >= 4) {
-                    item.child.style.display = 'none';
-                }
-            });
-
-            const gapPx = 12; // gap size in pixels
-
-            rows.forEach((row) => {
-                let aspectSum = 0;
-                row.forEach((item) => {
-                    aspectSum += 1.0 / item.aspect;
-                });
-
-                if (aspectSum <= 0) {
-                    aspectSum = 1.0;
-                }
-
-                const N = row.length;
-                const targetRowHeight = Math.max(
-                    350,
-                    Math.round(containerWidth * 0.55),
-                );
-                const calculatedHeight =
-                    (containerWidth - (N - 1) * gapPx) / aspectSum;
-                const rowHeight = Math.min(calculatedHeight, targetRowHeight);
-
-                row.forEach((item) => {
-                    const itemWidth = rowHeight / item.aspect;
-                    item.child.style.width = `${itemWidth}px`;
-                    item.child.style.height = `${rowHeight}px`;
-                    item.child.style.display = 'block';
-                    item.child.style.margin = '0';
-
-                    if (item.img && item.img !== item.child) {
-                        item.img.style.width = '100%';
-                        item.img.style.height = '100%';
-                        item.img.style.objectFit = 'cover';
-                        item.img.style.margin = '0';
-                    } else if (item.img) {
-                        item.img.style.objectFit = 'cover';
-                        item.img.style.margin = '0';
-                    }
-                });
-            });
-        };
-
-        // Run initially
-        updateLayout();
-
-        // Monitor child additions/removals and image load states
-        let imgs: HTMLImageElement[] = [];
-        const handleLoad = () => updateLayout();
-
-        const setupImageListeners = () => {
-            // Remove old listeners
-            imgs.forEach((img) => img.removeEventListener('load', handleLoad));
-
-            const rootEl = containerRef.current;
-
-            if (!rootEl) {
-                return;
-            }
-
-            // Find current images inside root container
-            imgs = Array.from(rootEl.querySelectorAll('img'));
-            imgs.forEach((img) => {
-                if (img.complete && img.naturalWidth > 0) {
-                    // Already loaded
-                } else {
-                    img.addEventListener('load', handleLoad);
-                }
-            });
-            updateLayout();
-        };
-
-        setupImageListeners();
-
-        // Observe child changes inside the grid container
-        const mutationObserver = new MutationObserver(() => {
-            setupImageListeners();
-        });
-
-        if (containerRef.current) {
-            mutationObserver.observe(containerRef.current, {
-                childList: true,
-                subtree: true,
-            });
-        }
-
-        // ResizeObserver to handle container resizing dynamically
-        const resizeObserver = new ResizeObserver(() => {
-            updateLayout();
-        });
-
-        if (containerRef.current) {
-            resizeObserver.observe(containerRef.current);
-        }
-
-        return () => {
-            imgs.forEach((img) => img.removeEventListener('load', handleLoad));
-            mutationObserver.disconnect();
-            resizeObserver.disconnect();
-        };
-    }, [columns, width, currentImages.length, imagesSrcString]);
-
-    const startResize = (
-        e: React.MouseEvent | React.TouchEvent,
-        direction: 'left' | 'right',
-    ) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const isTouch = 'touches' in e;
-        const startX = isTouch ? e.touches[0].clientX : e.clientX;
-        const initialWidth =
-            containerRef.current?.getBoundingClientRect().width || 600;
-
-        setIsResizing(true);
-        setResizeWidth(initialWidth);
-        lastWidthRef.current = initialWidth;
-
-        const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
-            const currentX =
-                'touches' in moveEvent
-                    ? moveEvent.touches[0].clientX
-                    : moveEvent.clientX;
-            const deltaX = currentX - startX;
-
-            let newWidth = initialWidth;
-
-            if (direction === 'right') {
-                if (align === 'center') {
-                    newWidth = initialWidth + deltaX * 2;
-                } else if (align === 'left') {
-                    newWidth = initialWidth + deltaX;
-                } else if (align === 'right') {
-                    newWidth = initialWidth - deltaX;
-                }
-            } else {
-                // left
-                if (align === 'center') {
-                    newWidth = initialWidth - deltaX * 2;
-                } else if (align === 'left') {
-                    newWidth = initialWidth - deltaX;
-                } else if (align === 'right') {
-                    newWidth = initialWidth + deltaX;
-                }
-            }
-
-            // Min and max limits
-            const minWidth = 200;
-            const maxWidth =
-                containerRef.current?.parentElement?.getBoundingClientRect()
-                    .width || 1200;
-            newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
-
-            const finalW = Math.round(newWidth);
-            lastWidthRef.current = finalW;
-            setResizeWidth(finalW);
-        };
-
-        const handleEnd = () => {
-            setIsResizing(false);
-
-            document.removeEventListener('mousemove', handleMove);
-            document.removeEventListener('mouseup', handleEnd);
-            document.removeEventListener('touchmove', handleMove);
-            document.removeEventListener('touchend', handleEnd);
-
-            if (lastWidthRef.current !== null) {
-                updateAttributes({ width: lastWidthRef.current });
-            }
-
-            setResizeWidth(null);
-            lastWidthRef.current = null;
-        };
-
-        document.addEventListener('mousemove', handleMove);
-        document.addEventListener('mouseup', handleEnd);
-        document.addEventListener('touchmove', handleMove, { passive: false });
-        document.addEventListener('touchend', handleEnd);
-    };
-
-    const handleSelectGrid = (e: React.MouseEvent) => {
-        const pos = getPos();
-
-        if (pos !== undefined) {
-            const target = e.target as HTMLElement;
-
-            if (
-                target.closest('button') ||
-                target.closest('[role="dialog"]') ||
-                target.closest('input') ||
-                target.closest('[data-type="dialog"]')
-            ) {
-                return;
-            }
-
-            e.preventDefault();
-            e.stopPropagation();
-            editor.commands.setNodeSelection(pos);
-        }
-    };
-
-    const currentWidth = isResizing ? resizeWidth : width;
-    const wrapperStyle = {
-        width: currentWidth ? `${currentWidth}px` : '100%',
-        marginLeft: align === 'left' ? '0' : 'auto',
-        marginRight: align === 'right' ? '0' : 'auto',
-    };
-
-    const updateColumns = (cols: number) => {
-        updateAttributes({ columns: cols });
-    };
-
-    const handleDeleteGrid = () => {
-        const pos = getPos();
-
-        if (pos !== undefined) {
-            editor.commands.deleteRange({
-                from: pos,
-                to: pos + node.nodeSize,
-            });
-            setIsOpen(false);
-            toast.success('Cuadrícula de imágenes eliminada');
-        }
-    };
-
-    const handleDeleteImage = (offset: number, size: number) => {
-        const pos = getPos();
-
-        if (pos !== undefined) {
-            editor.commands.deleteRange({
-                from: pos + 1 + offset,
-                to: pos + 1 + offset + size,
-            });
-            toast.success('Imagen eliminada de la galería');
-        }
-    };
-
-    const handleCropImage = async (
-        imgOffset: number,
-        imgNodeSize: number,
-        croppedBlob: Blob,
-    ) => {
-        const uploadToast = toast.loading('Guardando imagen recortada...');
-
-        try {
-            const uploadUrl = getUploadUrl();
-
-            const data = await uploadImageToEndpoint(
-                uploadUrl,
-                croppedBlob,
-                'cropped.jpg',
-            );
-
-            if (data.url) {
-                const pos = getPos();
-
-                if (pos !== undefined) {
-                    const targetPos = pos + 1 + imgOffset;
-
-                    // Replace the old image attributes with the new cropped ones atomically
-                    editor
-                        .chain()
-                        .focus()
-                        .command(({ tr }: any) => {
-                            const node = tr.doc.nodeAt(targetPos);
-
-                            if (node) {
-                                tr.setNodeMarkup(targetPos, undefined, {
-                                    ...node.attrs,
-                                    src: data.url,
-                                    width: null,
-                                    height: null,
-                                });
-                            }
-
-                            return true;
-                        })
-                        .run();
-
-                    toast.dismiss(uploadToast);
-                    toast.success('Imagen recortada con éxito');
-
-                    return;
-                }
-            }
-        } catch (err) {
-            console.error(err);
-        }
-
-        toast.dismiss(uploadToast);
-        toast.error('Error al guardar la imagen recortada');
-    };
-
-    const handleAddImage = () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.multiple = true;
-        input.onchange = async (e) => {
-            const files = Array.from(
-                (e.target as HTMLInputElement).files || [],
-            );
-
-            if (files.length === 0) {
-                return;
-            }
-
-            const uploadToast = toast.loading('Subiendo imágenes...');
-
-            let successCount = 0;
-
-            for (const file of files) {
-                try {
-                    const uploadUrl = getUploadUrl();
-
-                    const data = await uploadImageToEndpoint(
-                        uploadUrl,
-                        file,
-                        file.name,
-                    );
-
-                    if (data.url) {
-                        const pos = getPos();
-
-                        if (pos !== undefined) {
-                            // Insert image at the end of the grid node
-                            const insertPos = pos + node.nodeSize - 1;
-                            editor
-                                .chain()
-                                .focus()
-                                .insertContentAt(insertPos, {
-                                    type: 'image',
-                                    attrs: {
-                                        src: data.url,
-                                        alignment: 'center',
-                                        order:
-                                            currentImages.length +
-                                            successCount +
-                                            1,
-                                    },
-                                })
-                                .run();
-                            successCount++;
-                        }
-                    }
-                } catch (err) {
-                    console.error(err);
-                }
-            }
-
-            toast.dismiss(uploadToast);
-
-            if (successCount > 0) {
-                toast.success(`${successCount} imagen(es) subida(s) con éxito`);
-            } else {
-                toast.error('Error al subir las imágenes');
-            }
-        };
-        input.click();
-    };
-
-    return (
-        <NodeViewWrapper
-            ref={containerRef}
-            data-type="image-grid"
-            data-columns={columns}
-            style={wrapperStyle}
-            onClick={handleSelectGrid}
-            className="image-grid-container group relative my-4 rounded-lg border border-slate-200 bg-slate-50/10 p-1.5 dark:border-slate-800/80 dark:bg-slate-950/5"
-        >
-            {/* Left and Right Resize Handles */}
-            {isEditable && currentImages.length > 0 && (
-                <>
-                    <div
-                        className={cn(
-                            'absolute top-2 bottom-2 left-0 z-20 flex w-2 cursor-ew-resize items-center justify-center rounded-l bg-indigo-500/20 transition-all hover:bg-indigo-500/40',
-                            isResizing
-                                ? 'opacity-100'
-                                : 'opacity-0 group-hover:opacity-100 hover:opacity-100',
-                        )}
-                        onMouseDown={(e) => startResize(e, 'left')}
-                        onTouchStart={(e) => startResize(e, 'left')}
-                    >
-                        <div className="h-4 w-[2px] rounded bg-indigo-600" />
-                    </div>
-
-                    <div
-                        className={cn(
-                            'absolute top-2 right-0 bottom-2 z-20 flex w-2 cursor-ew-resize items-center justify-center rounded-r bg-indigo-500/20 transition-all hover:bg-indigo-500/40',
-                            isResizing
-                                ? 'opacity-100'
-                                : 'opacity-0 group-hover:opacity-100 hover:opacity-100',
-                        )}
-                        onMouseDown={(e) => startResize(e, 'right')}
-                        onTouchStart={(e) => startResize(e, 'right')}
-                    >
-                        <div className="h-4 w-[2px] rounded bg-indigo-600" />
-                    </div>
-
-                    {isResizing && currentWidth && (
-                        <div
-                            style={{
-                                position: 'absolute',
-                                bottom: '-25px',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                backgroundColor: 'rgba(0, 0, 0, 0.75)',
-                                color: '#fff',
-                                fontSize: '10px',
-                                padding: '2px 8px',
-                                borderRadius: '9999px',
-                                pointerEvents: 'none',
-                                zIndex: 50,
-                            }}
-                        >
-                            {currentWidth}px
-                        </div>
-                    )}
-                </>
-            )}
-            {/* Gallery settings trigger button (visible on hover) */}
-            {isEditable && currentImages.length > 0 && (
-                <div className="absolute top-2 right-2 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-                        <DialogTrigger asChild>
-                            <button
-                                type="button"
-                                className="flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                            >
-                                <Settings2 className="h-3.5 w-3.5 text-indigo-500" />
-                                <span>Configurar Galería</span>
-                            </button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-xl">
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
-                                    <LayoutGrid className="h-5 w-5 text-indigo-500" />
-                                    <span>Configurar Galería de Imágenes</span>
-                                </DialogTitle>
-                            </DialogHeader>
-
-                            <div className="space-y-5 py-3">
-                                {/* Columns Selector */}
-                                <div className="space-y-2">
-                                    <label className="block text-[10px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
-                                        Distribución de Columnas
-                                    </label>
-                                    <div className="grid grid-cols-4 gap-2">
-                                        {[1, 2, 3, 4].map((cols) => (
-                                            <button
-                                                key={cols}
-                                                type="button"
-                                                onClick={() =>
-                                                    updateColumns(cols)
-                                                }
-                                                className={cn(
-                                                    'flex cursor-pointer flex-col items-center justify-center rounded-lg border p-3 text-center transition-all duration-200',
-                                                    columns === cols
-                                                        ? 'border-indigo-500 bg-indigo-50/30 text-indigo-600 ring-1 ring-indigo-500/20 dark:bg-indigo-950/20 dark:text-indigo-400'
-                                                        : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-900/50 dark:hover:text-slate-300',
-                                                )}
-                                            >
-                                                <Columns className="mb-1 h-4 w-4" />
-                                                <span className="text-xs font-semibold">
-                                                    {cols}{' '}
-                                                    {cols === 1
-                                                        ? 'Columna'
-                                                        : 'Columnas'}
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Images Manager */}
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-[10px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
-                                            Imágenes en Galería (
-                                            {currentImages.length})
-                                        </label>
-                                        <button
-                                            type="button"
-                                            onClick={handleAddImage}
-                                            className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
-                                        >
-                                            <Plus className="h-3.5 w-3.5" />
-                                            <span>Subir imágenes</span>
-                                        </button>
-                                    </div>
-
-                                    {currentImages.length === 0 ? (
-                                        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-slate-800 dark:bg-slate-950/20">
-                                            <ImageIcon className="mx-auto mb-2 h-8 w-8 text-slate-300 dark:text-slate-700" />
-                                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                                                No hay imágenes añadidas
-                                            </p>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={handleAddImage}
-                                                className="mt-3 cursor-pointer"
-                                            >
-                                                Añadir primera imagen
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <DragDropContext
-                                            onDragEnd={handleDragEnd}
-                                        >
-                                            <Droppable
-                                                droppableId="gallery-images-droppable"
-                                                direction="horizontal"
-                                            >
-                                                {(droppableProvided) => (
-                                                    <div
-                                                        ref={
-                                                            droppableProvided.innerRef
-                                                        }
-                                                        {...droppableProvided.droppableProps}
-                                                        className="grid max-h-64 grid-cols-4 gap-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-3 pr-1 dark:border-slate-800 dark:bg-slate-950/10"
-                                                    >
-                                                        {currentImages.map(
-                                                            (img, idx) => (
-                                                                <Draggable
-                                                                    key={`gallery-img-${idx}-${img.src}`}
-                                                                    draggableId={`gallery-img-${idx}-${img.src}`}
-                                                                    index={idx}
-                                                                >
-                                                                    {(
-                                                                        draggableProvided,
-                                                                        snapshot,
-                                                                    ) => {
-                                                                        const child =
-                                                                            (
-                                                                                <div
-                                                                                    ref={
-                                                                                        draggableProvided.innerRef
-                                                                                    }
-                                                                                    {...draggableProvided.draggableProps}
-                                                                                    className={cn(
-                                                                                        'group/img relative flex flex-col overflow-hidden rounded-md border border-slate-200 bg-slate-100 p-1 transition-shadow dark:border-slate-800 dark:bg-slate-900',
-                                                                                        snapshot.isDragging &&
-                                                                                            'z-50 bg-white shadow-xl ring-2 ring-indigo-500 dark:bg-slate-800',
-                                                                                    )}
-                                                                                >
-                                                                                    <div className="relative aspect-square w-full overflow-hidden rounded">
-                                                                                        <img
-                                                                                            src={
-                                                                                                img.src
-                                                                                            }
-                                                                                            alt={`Thumbnail ${idx + 1}`}
-                                                                                            className="h-full w-full object-cover"
-                                                                                        />
-
-                                                                                        {/* Drag Handle & Order Badge */}
-                                                                                        <div
-                                                                                            {...draggableProvided.dragHandleProps}
-                                                                                            className="absolute top-1 left-1 flex h-6 cursor-grab items-center gap-0.5 rounded bg-black/60 px-1.5 text-[11px] font-semibold text-white backdrop-blur-xs transition-colors hover:bg-black/80 active:cursor-grabbing"
-                                                                                            title="Arrastrar para reordenar"
-                                                                                        >
-                                                                                            <GripVertical className="h-3 w-3 text-slate-300" />
-                                                                                            <span>
-                                                                                                #
-                                                                                                {idx +
-                                                                                                    1}
-                                                                                            </span>
-                                                                                        </div>
-
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={() =>
-                                                                                                setCroppingImage(
-                                                                                                    img,
-                                                                                                )
-                                                                                            }
-                                                                                            className="absolute top-1 right-8 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-white text-slate-700 opacity-0 shadow-md transition-opacity duration-200 group-hover/img:opacity-100 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                                                                                            title="Recortar imagen"
-                                                                                        >
-                                                                                            <Crop className="h-3.5 w-3.5 text-indigo-500" />
-                                                                                        </button>
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={() =>
-                                                                                                handleDeleteImage(
-                                                                                                    img.offset,
-                                                                                                    img.nodeSize,
-                                                                                                )
-                                                                                            }
-                                                                                            className="absolute top-1 right-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-red-500 text-white opacity-0 shadow-md transition-opacity duration-200 group-hover/img:opacity-100 hover:bg-red-600"
-                                                                                            title="Eliminar de la galería"
-                                                                                        >
-                                                                                            <X className="h-3.5 w-3.5" />
-                                                                                        </button>
-                                                                                    </div>
-                                                                                    <input
-                                                                                        type="text"
-                                                                                        value={
-                                                                                            img.caption ||
-                                                                                            ''
-                                                                                        }
-                                                                                        placeholder="Pie de foto..."
-                                                                                        onChange={(
-                                                                                            e,
-                                                                                        ) =>
-                                                                                            handleUpdateImageCaption(
-                                                                                                img.offset,
-                                                                                                e
-                                                                                                    .target
-                                                                                                    .value,
-                                                                                            )
-                                                                                        }
-                                                                                        className="mt-1 w-full rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-700 italic focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-                                                                                    />
-                                                                                </div>
-                                                                            );
-
-                                                                        if (
-                                                                            snapshot.isDragging &&
-                                                                            typeof window !==
-                                                                                'undefined'
-                                                                        ) {
-                                                                            return createPortal(
-                                                                                child,
-                                                                                document.body,
-                                                                            );
-                                                                        }
-
-                                                                        return child;
-                                                                    }}
-                                                                </Draggable>
-                                                            ),
-                                                        )}
-                                                        {
-                                                            droppableProvided.placeholder
-                                                        }
-                                                    </div>
-                                                )}
-                                            </Droppable>
-                                        </DragDropContext>
-                                    )}
-                                </div>
-                            </div>
-
-                            <DialogFooter className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3 sm:justify-between dark:border-slate-900">
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={handleDeleteGrid}
-                                    className="h-9 cursor-pointer gap-1.5 text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                    <span>Eliminar Galería</span>
-                                </Button>
-                                <DialogClose asChild>
-                                    <Button
-                                        type="button"
-                                        className="h-9 cursor-pointer"
-                                    >
-                                        Listo
-                                    </Button>
-                                </DialogClose>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </div>
-            )}
-
-            {/* Empty state card (triggers the setup dialog immediately) */}
-            {isEditable && currentImages.length === 0 && (
-                <Dialog open={isOpen} onOpenChange={setIsOpen}>
-                    <DialogTrigger asChild>
-                        <div className="my-2 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-background p-8 transition-colors select-none hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40">
-                            <LayoutGrid className="mb-2 h-8 w-8 text-slate-400 dark:text-slate-600" />
-                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                                Galería de Imágenes Vacía
-                            </p>
-                            <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
-                                Haga clic aquí para configurar, elegir columnas
-                                y añadir imágenes.
-                            </p>
-                        </div>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-xl">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                                <LayoutGrid className="h-5 w-5 text-indigo-500" />
-                                <span>Configurar Galería de Imágenes</span>
-                            </DialogTitle>
-                        </DialogHeader>
-
-                        <div className="space-y-5 py-3">
-                            {/* Columns Selector */}
-                            <div className="space-y-2">
-                                <label className="block text-[10px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
-                                    Distribución de Columnas
-                                </label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {[1, 2, 3, 4].map((cols) => (
-                                        <button
-                                            key={cols}
-                                            type="button"
-                                            onClick={() => updateColumns(cols)}
-                                            className={cn(
-                                                'flex cursor-pointer flex-col items-center justify-center rounded-lg border p-3 text-center transition-all duration-200',
-                                                columns === cols
-                                                    ? 'border-indigo-500 bg-indigo-50/30 text-indigo-600 ring-1 ring-indigo-500/20 dark:bg-indigo-950/20 dark:text-indigo-400'
-                                                    : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-900/50 dark:hover:text-slate-300',
-                                            )}
-                                        >
-                                            <Columns className="mb-1 h-4 w-4" />
-                                            <span className="text-xs font-semibold">
-                                                {cols}{' '}
-                                                {cols === 1
-                                                    ? 'Columna'
-                                                    : 'Columnas'}
-                                            </span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Images Manager */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-[10px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
-                                        Imágenes en Galería (0)
-                                    </label>
-                                    <button
-                                        type="button"
-                                        onClick={handleAddImage}
-                                        className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
-                                    >
-                                        <Plus className="h-3.5 w-3.5" />
-                                        <span>Subir imágenes</span>
-                                    </button>
-                                </div>
-
-                                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-slate-800 dark:bg-slate-950/20">
-                                    <ImageIcon className="mx-auto mb-2 h-8 w-8 text-slate-300 dark:text-slate-700" />
-                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                                        No hay imágenes añadidas
-                                    </p>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleAddImage}
-                                        className="mt-3 cursor-pointer"
-                                    >
-                                        Añadir imágenes
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <DialogFooter className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3 sm:justify-between dark:border-slate-900">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={handleDeleteGrid}
-                                className="h-9 cursor-pointer gap-1.5 text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
-                            >
-                                <Trash2 className="h-4 w-4" />
-                                <span>Eliminar Galería</span>
-                            </Button>
-                            <DialogClose asChild>
-                                <Button
-                                    type="button"
-                                    className="h-9 cursor-pointer"
-                                >
-                                    Listo
-                                </Button>
-                            </DialogClose>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            )}
-
-            {/* Grid display layout */}
-            <NodeViewContent
-                className={cn(
-                    'w-full',
-                    isEditable && currentImages.length === 0 && 'hidden',
-                )}
-            />
-            {/* Image Cropper Modal */}
-            {croppingImage && (
-                <ImageCropperDialog
-                    src={croppingImage.src}
-                    isOpen={croppingImage !== null}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setCroppingImage(null);
-                        }
-                    }}
-                    onCrop={async (blob) => {
-                        await handleCropImage(
-                            croppingImage.offset,
-                            croppingImage.nodeSize,
-                            blob,
-                        );
-                        setCroppingImage(null);
-                    }}
-                />
-            )}
-        </NodeViewWrapper>
-    );
+	const columns = node.attrs.columns || 2;
+	const align = node.attrs.alignment || 'center';
+	const width = node.attrs.width;
+	const isEditable = editor.isEditable;
+
+	// Fetch the specimenSequenceCode from the extension options
+	const extOptions = editor.extensionManager.extensions.find(
+		(ext: any) => ext.name === 'imageGrid',
+	)?.options;
+	const specimenSequenceCode = extOptions?.specimenSequenceCode || '';
+
+	// Helper to get upload URL across reports, templates, and delivery notes
+	const getUploadUrl = () => {
+		if (extOptions?.uploadUrl) {
+			return extOptions.uploadUrl;
+		}
+
+		if (specimenSequenceCode) {
+			return `/specimens/${specimenSequenceCode}/report-editor/upload-image`;
+		}
+
+		if (typeof window !== 'undefined') {
+			const pathname = window.location.pathname;
+			const workOrderMatch = pathname.match(/\/work-orders\/(\d+)/);
+
+			if (workOrderMatch) {
+				return `/work-orders/${workOrderMatch[1]}/delivery-note/upload-image`;
+			}
+
+			if (pathname.includes('/my-specimen-type-templates')) {
+				return `/my-specimen-type-templates/upload-image`;
+			}
+		}
+
+		return `/specimen-type-templates/upload-image`;
+	};
+
+	// Collect current images reactively
+	const currentImages: Array<{
+		src: string;
+		caption: string;
+		order?: number | null;
+		offset: number;
+		nodeSize: number;
+		childNode: any;
+	}> = [];
+	node.content.forEach((childNode: any, offset: number) => {
+		if (childNode.type.name === 'image') {
+			currentImages.push({
+				src: childNode.attrs.src,
+				caption: childNode.attrs.caption || '',
+				order: childNode.attrs.order ?? null,
+				offset,
+				nodeSize: childNode.nodeSize,
+				childNode,
+			});
+		}
+	});
+
+	const imagesSrcString = currentImages
+		.map((img, idx) => `${img.src}_${img.caption}_${img.order ?? idx}`)
+		.join(',');
+
+	const handleDragEnd = (result: DropResult) => {
+		if (
+			!result.destination ||
+			result.destination.index === result.source.index
+		) {
+			return;
+		}
+
+		const pos = getPos();
+
+		if (pos === undefined) {
+			return;
+		}
+
+		const liveNode = editor.state.doc.nodeAt(pos);
+
+		if (!liveNode || liveNode.type.name !== 'imageGrid') {
+			return;
+		}
+
+		const items = [...currentImages];
+		const [moved] = items.splice(result.source.index, 1);
+		items.splice(result.destination.index, 0, moved);
+
+		// Recreate child nodes in new order with updated order attributes (1-based)
+		const newNodes = items.map((item, idx) => {
+			return editor.schema.nodes.image.create({
+				...item.childNode.attrs,
+				order: idx + 1,
+			});
+		});
+
+		const from = pos + 1;
+		const to = pos + liveNode.nodeSize - 1;
+
+		editor
+			.chain()
+			.focus()
+			.command(({ tr }: any) => {
+				tr.replaceWith(from, to, newNodes);
+
+				return true;
+			})
+			.run();
+
+		toast.success('Imágenes reordenadas');
+	};
+
+	const handleUpdateImageCaption = (offset: number, caption: string) => {
+		const pos = getPos();
+
+		if (pos !== undefined) {
+			const targetPos = pos + 1 + offset;
+			const child = editor.state.tr.doc.nodeAt(targetPos);
+
+			if (child) {
+				editor.view.dispatch(
+					editor.state.tr.setNodeMarkup(targetPos, undefined, {
+						...child.attrs,
+						caption,
+					}),
+				);
+			}
+		}
+	};
+
+	const [isOpen, setIsOpen] = useState(false);
+	const [croppingImage, setCroppingImage] = useState<{
+		src: string;
+		offset: number;
+		nodeSize: number;
+	} | null>(null);
+
+	const [isResizing, setIsResizing] = useState(false);
+	const [resizeWidth, setResizeWidth] = useState<number | null>(null);
+	const containerRef = useRef<HTMLDivElement>(null);
+	const lastWidthRef = useRef<number | null>(null);
+
+	useEffect(() => {
+		if (!containerRef.current) {
+			return;
+		}
+
+		const getTargetContainer = () => {
+			if (!containerRef.current) {
+				return null;
+			}
+
+			const contentEl = (containerRef.current.querySelector(
+				'[data-node-view-content]',
+			) || containerRef.current.querySelector('.w-full')) as HTMLElement;
+
+			if (!contentEl) {
+				return null;
+			}
+
+			return (contentEl.querySelector('[data-node-view-content-react]') ||
+				contentEl) as HTMLElement;
+		};
+
+		const updateLayout = () => {
+			const targetContainer = getTargetContainer();
+
+			if (!targetContainer) {
+				return;
+			}
+
+			// Apply flex layout to content container
+			targetContainer.style.display = 'flex';
+			targetContainer.style.flexWrap = 'nowrap';
+			targetContainer.style.gap = '12px';
+			targetContainer.style.justifyContent = 'flex-start';
+			targetContainer.style.width = '100%';
+
+			const contentEl = (containerRef.current?.querySelector(
+				'[data-node-view-content]',
+			) || containerRef.current?.querySelector('.w-full')) as HTMLElement;
+
+			if (contentEl && targetContainer !== contentEl) {
+				contentEl.style.display = 'flex';
+				contentEl.style.width = '100%';
+			}
+
+			const containerWidth =
+				targetContainer.getBoundingClientRect().width ||
+				contentEl?.getBoundingClientRect().width ||
+				width ||
+				600;
+			const children = Array.from(
+				targetContainer.children,
+			) as HTMLElement[];
+
+			if (children.length === 0) {
+				return;
+			}
+
+			// Get image details (element and aspect ratio)
+			const imgItems = children.map((child) => {
+				let img: HTMLImageElement | null = null;
+
+				if (child.tagName.toLowerCase() === 'img') {
+					img = child as HTMLImageElement;
+				} else {
+					img = child.querySelector('img');
+				}
+
+				const aspect =
+					img && img.naturalWidth > 0 && img.naturalHeight > 0
+						? img.naturalHeight / img.naturalWidth
+						: 1.0;
+
+				return { child, img, aspect };
+			});
+
+			// Group into exactly one row of up to 4 images
+			const slicedImgItems = imgItems.slice(0, 4);
+			const rows = [slicedImgItems];
+
+			// Hide any extra images beyond 4
+			imgItems.forEach((item, idx) => {
+				if (idx >= 4) {
+					item.child.style.display = 'none';
+				}
+			});
+
+			const gapPx = 12; // gap size in pixels
+
+			rows.forEach((row) => {
+				let aspectSum = 0;
+				row.forEach((item) => {
+					aspectSum += 1.0 / item.aspect;
+				});
+
+				if (aspectSum <= 0) {
+					aspectSum = 1.0;
+				}
+
+				const N = row.length;
+				const targetRowHeight = Math.max(
+					350,
+					Math.round(containerWidth * 0.55),
+				);
+				const calculatedHeight =
+					(containerWidth - (N - 1) * gapPx) / aspectSum;
+				const rowHeight = Math.min(calculatedHeight, targetRowHeight);
+
+				row.forEach((item) => {
+					const itemWidth = rowHeight / item.aspect;
+					item.child.style.width = `${itemWidth}px`;
+					item.child.style.height = `${rowHeight}px`;
+					item.child.style.display = 'block';
+					item.child.style.margin = '0';
+
+					if (item.img && item.img !== item.child) {
+						item.img.style.width = '100%';
+						item.img.style.height = '100%';
+						item.img.style.objectFit = 'cover';
+						item.img.style.margin = '0';
+					} else if (item.img) {
+						item.img.style.objectFit = 'cover';
+						item.img.style.margin = '0';
+					}
+				});
+			});
+		};
+
+		// Run initially
+		updateLayout();
+
+		// Monitor child additions/removals and image load states
+		let imgs: HTMLImageElement[] = [];
+		const handleLoad = () => updateLayout();
+
+		const setupImageListeners = () => {
+			// Remove old listeners
+			imgs.forEach((img) => img.removeEventListener('load', handleLoad));
+
+			const rootEl = containerRef.current;
+
+			if (!rootEl) {
+				return;
+			}
+
+			// Find current images inside root container
+			imgs = Array.from(rootEl.querySelectorAll('img'));
+			imgs.forEach((img) => {
+				if (img.complete && img.naturalWidth > 0) {
+					// Already loaded
+				} else {
+					img.addEventListener('load', handleLoad);
+				}
+			});
+			updateLayout();
+		};
+
+		setupImageListeners();
+
+		// Observe child changes inside the grid container
+		const mutationObserver = new MutationObserver(() => {
+			setupImageListeners();
+		});
+
+		if (containerRef.current) {
+			mutationObserver.observe(containerRef.current, {
+				childList: true,
+				subtree: true,
+			});
+		}
+
+		// ResizeObserver to handle container resizing dynamically
+		const resizeObserver = new ResizeObserver(() => {
+			updateLayout();
+		});
+
+		if (containerRef.current) {
+			resizeObserver.observe(containerRef.current);
+		}
+
+		return () => {
+			imgs.forEach((img) => img.removeEventListener('load', handleLoad));
+			mutationObserver.disconnect();
+			resizeObserver.disconnect();
+		};
+	}, [columns, width, currentImages.length, imagesSrcString]);
+
+	const startResize = (
+		e: React.MouseEvent | React.TouchEvent,
+		direction: 'left' | 'right',
+	) => {
+		e.preventDefault();
+		e.stopPropagation();
+
+		const isTouch = 'touches' in e;
+		const startX = isTouch ? e.touches[0].clientX : e.clientX;
+		const initialWidth =
+			containerRef.current?.getBoundingClientRect().width || 600;
+
+		setIsResizing(true);
+		setResizeWidth(initialWidth);
+		lastWidthRef.current = initialWidth;
+
+		const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+			const currentX =
+				'touches' in moveEvent
+					? moveEvent.touches[0].clientX
+					: moveEvent.clientX;
+			const deltaX = currentX - startX;
+
+			let newWidth = initialWidth;
+
+			if (direction === 'right') {
+				if (align === 'center') {
+					newWidth = initialWidth + deltaX * 2;
+				} else if (align === 'left') {
+					newWidth = initialWidth + deltaX;
+				} else if (align === 'right') {
+					newWidth = initialWidth - deltaX;
+				}
+			} else {
+				// left
+				if (align === 'center') {
+					newWidth = initialWidth - deltaX * 2;
+				} else if (align === 'left') {
+					newWidth = initialWidth - deltaX;
+				} else if (align === 'right') {
+					newWidth = initialWidth + deltaX;
+				}
+			}
+
+			// Min and max limits
+			const minWidth = 200;
+			const maxWidth =
+				containerRef.current?.parentElement?.getBoundingClientRect()
+					.width || 1200;
+			newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+			const finalW = Math.round(newWidth);
+			lastWidthRef.current = finalW;
+			setResizeWidth(finalW);
+		};
+
+		const handleEnd = () => {
+			setIsResizing(false);
+
+			document.removeEventListener('mousemove', handleMove);
+			document.removeEventListener('mouseup', handleEnd);
+			document.removeEventListener('touchmove', handleMove);
+			document.removeEventListener('touchend', handleEnd);
+
+			if (lastWidthRef.current !== null) {
+				updateAttributes({ width: lastWidthRef.current });
+			}
+
+			setResizeWidth(null);
+			lastWidthRef.current = null;
+		};
+
+		document.addEventListener('mousemove', handleMove);
+		document.addEventListener('mouseup', handleEnd);
+		document.addEventListener('touchmove', handleMove, { passive: false });
+		document.addEventListener('touchend', handleEnd);
+	};
+
+	const handleSelectGrid = (e: React.MouseEvent) => {
+		const pos = getPos();
+
+		if (pos !== undefined) {
+			const target = e.target as HTMLElement;
+
+			if (
+				target.closest('button') ||
+				target.closest('[role="dialog"]') ||
+				target.closest('input') ||
+				target.closest('[data-type="dialog"]')
+			) {
+				return;
+			}
+
+			e.preventDefault();
+			e.stopPropagation();
+			editor.commands.setNodeSelection(pos);
+		}
+	};
+
+	const currentWidth = isResizing ? resizeWidth : width;
+	const wrapperStyle = {
+		width: currentWidth ? `${currentWidth}px` : '100%',
+		marginLeft: align === 'left' ? '0' : 'auto',
+		marginRight: align === 'right' ? '0' : 'auto',
+	};
+
+	const updateColumns = (cols: number) => {
+		updateAttributes({ columns: cols });
+	};
+
+	const handleDeleteGrid = () => {
+		const pos = getPos();
+
+		if (pos !== undefined) {
+			editor.commands.deleteRange({
+				from: pos,
+				to: pos + node.nodeSize,
+			});
+			setIsOpen(false);
+			toast.success('Cuadrícula de imágenes eliminada');
+		}
+	};
+
+	const handleDeleteImage = (offset: number) => {
+		const pos = getPos();
+
+		if (pos === undefined) {
+			return;
+		}
+
+		const liveNode = editor.state.doc.nodeAt(pos);
+
+		if (!liveNode || liveNode.type.name !== 'imageGrid') {
+			return;
+		}
+
+		// Collect existing child images, excluding the one at offset
+		const remainingItems: any[] = [];
+		let currentOffset = 0;
+
+		liveNode.content.forEach((child: any) => {
+			if (child.type.name === 'image') {
+				if (currentOffset !== offset) {
+					remainingItems.push(child.attrs);
+				}
+
+				currentOffset += child.nodeSize;
+			}
+		});
+
+		// Re-index remaining images with consecutive order (1-based: 1, 2, ..., N)
+		const newNodes = remainingItems.map((item, idx) => {
+			return editor.schema.nodes.image.create({
+				...item,
+				order: idx + 1,
+			});
+		});
+
+		const from = pos + 1;
+		const to = pos + liveNode.nodeSize - 1;
+
+		editor
+			.chain()
+			.focus()
+			.command(({ tr }: any) => {
+				tr.replaceWith(from, to, newNodes);
+
+				return true;
+			})
+			.run();
+
+		toast.success('Imagen eliminada de la galería');
+	};
+
+	const handleCropImage = async (
+		imgOffset: number,
+		imgNodeSize: number,
+		croppedBlob: Blob,
+	) => {
+		const uploadToast = toast.loading('Guardando imagen recortada...');
+
+		try {
+			const uploadUrl = getUploadUrl();
+
+			const data = await uploadImageToEndpoint(
+				uploadUrl,
+				croppedBlob,
+				'cropped.jpg',
+			);
+
+			if (data.url) {
+				const pos = getPos();
+
+				if (pos !== undefined) {
+					const targetPos = pos + 1 + imgOffset;
+
+					// Replace the old image attributes with the new cropped ones atomically
+					editor
+						.chain()
+						.focus()
+						.command(({ tr }: any) => {
+							const node = tr.doc.nodeAt(targetPos);
+
+							if (node) {
+								tr.setNodeMarkup(targetPos, undefined, {
+									...node.attrs,
+									src: data.url,
+									width: null,
+									height: null,
+								});
+							}
+
+							return true;
+						})
+						.run();
+
+					toast.dismiss(uploadToast);
+					toast.success('Imagen recortada con éxito');
+
+					return;
+				}
+			}
+		} catch (err) {
+			console.error(err);
+		}
+
+		toast.dismiss(uploadToast);
+		toast.error('Error al guardar la imagen recortada');
+	};
+
+	const handleAddImage = () => {
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = 'image/*';
+		input.multiple = true;
+		input.onchange = async (e) => {
+			const files = Array.from(
+				(e.target as HTMLInputElement).files || [],
+			);
+
+			if (files.length === 0) {
+				return;
+			}
+
+			const uploadToast = toast.loading('Subiendo imágenes...');
+
+			const uploadedUrls: string[] = [];
+
+			for (const file of files) {
+				try {
+					const uploadUrl = getUploadUrl();
+
+					const data = await uploadImageToEndpoint(
+						uploadUrl,
+						file,
+						file.name,
+					);
+
+					if (data.url) {
+						uploadedUrls.push(data.url);
+					}
+				} catch (err) {
+					console.error(err);
+				}
+			}
+
+			toast.dismiss(uploadToast);
+
+			if (uploadedUrls.length === 0) {
+				toast.error('Error al subir las imágenes');
+
+				return;
+			}
+
+			const pos = getPos();
+
+			if (pos === undefined) {
+				return;
+			}
+
+			// Get live node from current editor state to avoid stale closure
+			const liveNode = editor.state.doc.nodeAt(pos);
+
+			if (!liveNode || liveNode.type.name !== 'imageGrid') {
+				return;
+			}
+
+			// Collect existing child images in current document order
+			const existingItems: any[] = [];
+			liveNode.content.forEach((child: any) => {
+				if (child.type.name === 'image') {
+					existingItems.push(child.attrs);
+				}
+			});
+
+			// Append new images in the order they were uploaded
+			const newItems = [
+				...existingItems,
+				...uploadedUrls.map((url) => ({
+					src: url,
+					caption: '',
+					alignment: 'center',
+				})),
+			];
+
+			// Re-index all images sequentially (1-based: 1, 2, ..., N)
+			const newNodes = newItems.map((item, idx) => {
+				return editor.schema.nodes.image.create({
+					...item,
+					order: idx + 1,
+				});
+			});
+
+			const from = pos + 1;
+			const to = pos + liveNode.nodeSize - 1;
+
+			editor
+				.chain()
+				.focus()
+				.command(({ tr }: any) => {
+					tr.replaceWith(from, to, newNodes);
+
+					return true;
+				})
+				.run();
+
+			toast.success(
+				`${uploadedUrls.length} imagen(es) subida(s) con éxito`,
+			);
+		};
+		input.click();
+	};
+
+	return (
+		<NodeViewWrapper
+			ref={containerRef}
+			data-type="image-grid"
+			data-columns={columns}
+			style={wrapperStyle}
+			onClick={handleSelectGrid}
+			className="image-grid-container group relative my-4 rounded-lg border border-slate-200 bg-slate-50/10 p-1.5 dark:border-slate-800/80 dark:bg-slate-950/5"
+		>
+			{/* Left and Right Resize Handles */}
+			{isEditable && currentImages.length > 0 && (
+				<>
+					<div
+						className={cn(
+							'absolute top-2 bottom-2 left-0 z-20 flex w-2 cursor-ew-resize items-center justify-center rounded-l bg-indigo-500/20 transition-all hover:bg-indigo-500/40',
+							isResizing
+								? 'opacity-100'
+								: 'opacity-0 group-hover:opacity-100 hover:opacity-100',
+						)}
+						onMouseDown={(e) => startResize(e, 'left')}
+						onTouchStart={(e) => startResize(e, 'left')}
+					>
+						<div className="h-4 w-[2px] rounded bg-indigo-600" />
+					</div>
+
+					<div
+						className={cn(
+							'absolute top-2 right-0 bottom-2 z-20 flex w-2 cursor-ew-resize items-center justify-center rounded-r bg-indigo-500/20 transition-all hover:bg-indigo-500/40',
+							isResizing
+								? 'opacity-100'
+								: 'opacity-0 group-hover:opacity-100 hover:opacity-100',
+						)}
+						onMouseDown={(e) => startResize(e, 'right')}
+						onTouchStart={(e) => startResize(e, 'right')}
+					>
+						<div className="h-4 w-[2px] rounded bg-indigo-600" />
+					</div>
+
+					{isResizing && currentWidth && (
+						<div
+							style={{
+								position: 'absolute',
+								bottom: '-25px',
+								left: '50%',
+								transform: 'translateX(-50%)',
+								backgroundColor: 'rgba(0, 0, 0, 0.75)',
+								color: '#fff',
+								fontSize: '10px',
+								padding: '2px 8px',
+								borderRadius: '9999px',
+								pointerEvents: 'none',
+								zIndex: 50,
+							}}
+						>
+							{currentWidth}px
+						</div>
+					)}
+				</>
+			)}
+			{/* Gallery settings trigger button (visible on hover) */}
+			{isEditable && currentImages.length > 0 && (
+				<div className="absolute top-2 right-2 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+					<Dialog open={isOpen} onOpenChange={setIsOpen}>
+						<DialogTrigger asChild>
+							<button
+								type="button"
+								className="flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 shadow-xs transition-colors hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+							>
+								<Settings2 className="h-3.5 w-3.5 text-indigo-500" />
+								<span>Configurar Galería</span>
+							</button>
+						</DialogTrigger>
+						<DialogContent className="sm:max-w-xl">
+							<DialogHeader>
+								<DialogTitle className="flex items-center gap-2">
+									<LayoutGrid className="h-5 w-5 text-indigo-500" />
+									<span>Configurar Galería de Imágenes</span>
+								</DialogTitle>
+							</DialogHeader>
+
+							<div className="space-y-5 py-3">
+								{/* Columns Selector */}
+								<div className="space-y-2">
+									<label className="block text-[10px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
+										Distribución de Columnas
+									</label>
+									<div className="grid grid-cols-4 gap-2">
+										{[1, 2, 3, 4].map((cols) => (
+											<button
+												key={cols}
+												type="button"
+												onClick={() =>
+													updateColumns(cols)
+												}
+												className={cn(
+													'flex cursor-pointer flex-col items-center justify-center rounded-lg border p-3 text-center transition-all duration-200',
+													columns === cols
+														? 'border-indigo-500 bg-indigo-50/30 text-indigo-600 ring-1 ring-indigo-500/20 dark:bg-indigo-950/20 dark:text-indigo-400'
+														: 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-900/50 dark:hover:text-slate-300',
+												)}
+											>
+												<Columns className="mb-1 h-4 w-4" />
+												<span className="text-xs font-semibold">
+													{cols}{' '}
+													{cols === 1
+														? 'Columna'
+														: 'Columnas'}
+												</span>
+											</button>
+										))}
+									</div>
+								</div>
+
+								{/* Images Manager */}
+								<div className="space-y-2">
+									<div className="flex items-center justify-between">
+										<label className="text-[10px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
+											Imágenes en Galería (
+											{currentImages.length})
+										</label>
+										<button
+											type="button"
+											onClick={handleAddImage}
+											className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+										>
+											<Plus className="h-3.5 w-3.5" />
+											<span>Subir imágenes</span>
+										</button>
+									</div>
+
+									{currentImages.length === 0 ? (
+										<div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-slate-800 dark:bg-slate-950/20">
+											<ImageIcon className="mx-auto mb-2 h-8 w-8 text-slate-300 dark:text-slate-700" />
+											<p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+												No hay imágenes añadidas
+											</p>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												onClick={handleAddImage}
+												className="mt-3 cursor-pointer"
+											>
+												Añadir primera imagen
+											</Button>
+										</div>
+									) : (
+										<DragDropContext
+											onDragEnd={handleDragEnd}
+										>
+											<Droppable
+												droppableId="gallery-images-droppable"
+												direction="horizontal"
+											>
+												{(droppableProvided) => (
+													<div
+														ref={
+															droppableProvided.innerRef
+														}
+														{...droppableProvided.droppableProps}
+														className="grid max-h-64 grid-cols-4 gap-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-3 pr-1 dark:border-slate-800 dark:bg-slate-950/10"
+													>
+														{currentImages.map(
+															(img, idx) => (
+																<Draggable
+																	key={`gallery-img-${idx}-${img.src}`}
+																	draggableId={`gallery-img-${idx}-${img.src}`}
+																	index={idx}
+																>
+																	{(
+																		draggableProvided,
+																		snapshot,
+																	) => {
+																		const child =
+																			(
+																				<div
+																					ref={
+																						draggableProvided.innerRef
+																					}
+																					{...draggableProvided.draggableProps}
+																					className={cn(
+																						'group/img relative flex flex-col overflow-hidden rounded-md border border-slate-200 bg-slate-100 p-1 transition-shadow dark:border-slate-800 dark:bg-slate-900',
+																						snapshot.isDragging &&
+																						'z-50 bg-white shadow-xl ring-2 ring-indigo-500 dark:bg-slate-800',
+																					)}
+																				>
+																					<div className="relative aspect-square w-full overflow-hidden rounded">
+																						<img
+																							src={
+																								img.src
+																							}
+																							alt={`Thumbnail ${idx + 1}`}
+																							className="h-full w-full object-cover"
+																						/>
+
+																						{/* Drag Handle & Order Badge */}
+																						<div
+																							{...draggableProvided.dragHandleProps}
+																							className="absolute top-1 left-1 flex h-6 cursor-grab items-center gap-0.5 rounded bg-black/60 px-1.5 text-[11px] font-semibold text-white backdrop-blur-xs transition-colors hover:bg-black/80 active:cursor-grabbing"
+																							title="Arrastrar para reordenar"
+																						>
+																							<GripVertical className="h-3 w-3 text-slate-300" />
+																							<span>
+																								#
+																								{idx +
+																									1}
+																							</span>
+																						</div>
+
+																						<button
+																							type="button"
+																							onClick={() =>
+																								setCroppingImage(
+																									img,
+																								)
+																							}
+																							className="absolute top-1 right-8 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-white text-slate-700 opacity-0 shadow-md transition-opacity duration-200 group-hover/img:opacity-100 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+																							title="Recortar imagen"
+																						>
+																							<Crop className="h-3.5 w-3.5 text-indigo-500" />
+																						</button>
+																						<button
+																							type="button"
+																							onClick={() =>
+																								handleDeleteImage(
+																									img.offset,
+																								)
+																							}
+																							className="absolute top-1 right-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-red-500 text-white opacity-0 shadow-md transition-opacity duration-200 group-hover/img:opacity-100 hover:bg-red-600"
+																							title="Eliminar de la galería"
+																						>
+																							<X className="h-3.5 w-3.5" />
+																						</button>
+																					</div>
+																					<input
+																						type="text"
+																						value={
+																							img.caption ||
+																							''
+																						}
+																						placeholder="Pie de foto..."
+																						onChange={(
+																							e,
+																						) =>
+																							handleUpdateImageCaption(
+																								img.offset,
+																								e
+																									.target
+																									.value,
+																							)
+																						}
+																						className="mt-1 w-full rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-700 italic focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+																					/>
+																				</div>
+																			);
+
+																		if (
+																			snapshot.isDragging &&
+																			typeof window !==
+																			'undefined'
+																		) {
+																			return createPortal(
+																				child,
+																				document.body,
+																			);
+																		}
+
+																		return child;
+																	}}
+																</Draggable>
+															),
+														)}
+														{
+															droppableProvided.placeholder
+														}
+													</div>
+												)}
+											</Droppable>
+										</DragDropContext>
+									)}
+								</div>
+							</div>
+
+							<DialogFooter className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3 sm:justify-between dark:border-slate-900">
+								<Button
+									type="button"
+									variant="ghost"
+									onClick={handleDeleteGrid}
+									className="h-9 cursor-pointer gap-1.5 text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+								>
+									<Trash2 className="h-4 w-4" />
+									<span>Eliminar Galería</span>
+								</Button>
+								<DialogClose asChild>
+									<Button
+										type="button"
+										className="h-9 cursor-pointer"
+									>
+										Listo
+									</Button>
+								</DialogClose>
+							</DialogFooter>
+						</DialogContent>
+					</Dialog>
+				</div>
+			)}
+
+			{/* Empty state card (triggers the setup dialog immediately) */}
+			{isEditable && currentImages.length === 0 && (
+				<Dialog open={isOpen} onOpenChange={setIsOpen}>
+					<DialogTrigger asChild>
+						<div className="my-2 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-background p-8 transition-colors select-none hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40">
+							<LayoutGrid className="mb-2 h-8 w-8 text-slate-400 dark:text-slate-600" />
+							<p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+								Galería de Imágenes Vacía
+							</p>
+							<p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
+								Haga clic aquí para configurar, elegir columnas
+								y añadir imágenes.
+							</p>
+						</div>
+					</DialogTrigger>
+					<DialogContent className="sm:max-w-xl">
+						<DialogHeader>
+							<DialogTitle className="flex items-center gap-2">
+								<LayoutGrid className="h-5 w-5 text-indigo-500" />
+								<span>Configurar Galería de Imágenes</span>
+							</DialogTitle>
+						</DialogHeader>
+
+						<div className="space-y-5 py-3">
+							{/* Columns Selector */}
+							<div className="space-y-2">
+								<label className="block text-[10px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
+									Distribución de Columnas
+								</label>
+								<div className="grid grid-cols-4 gap-2">
+									{[1, 2, 3, 4].map((cols) => (
+										<button
+											key={cols}
+											type="button"
+											onClick={() => updateColumns(cols)}
+											className={cn(
+												'flex cursor-pointer flex-col items-center justify-center rounded-lg border p-3 text-center transition-all duration-200',
+												columns === cols
+													? 'border-indigo-500 bg-indigo-50/30 text-indigo-600 ring-1 ring-indigo-500/20 dark:bg-indigo-950/20 dark:text-indigo-400'
+													: 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-900/50 dark:hover:text-slate-300',
+											)}
+										>
+											<Columns className="mb-1 h-4 w-4" />
+											<span className="text-xs font-semibold">
+												{cols}{' '}
+												{cols === 1
+													? 'Columna'
+													: 'Columnas'}
+											</span>
+										</button>
+									))}
+								</div>
+							</div>
+
+							{/* Images Manager */}
+							<div className="space-y-2">
+								<div className="flex items-center justify-between">
+									<label className="text-[10px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
+										Imágenes en Galería (0)
+									</label>
+									<button
+										type="button"
+										onClick={handleAddImage}
+										className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+									>
+										<Plus className="h-3.5 w-3.5" />
+										<span>Subir imágenes</span>
+									</button>
+								</div>
+
+								<div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-slate-800 dark:bg-slate-950/20">
+									<ImageIcon className="mx-auto mb-2 h-8 w-8 text-slate-300 dark:text-slate-700" />
+									<p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+										No hay imágenes añadidas
+									</p>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={handleAddImage}
+										className="mt-3 cursor-pointer"
+									>
+										Añadir imágenes
+									</Button>
+								</div>
+							</div>
+						</div>
+
+						<DialogFooter className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3 sm:justify-between dark:border-slate-900">
+							<Button
+								type="button"
+								variant="ghost"
+								onClick={handleDeleteGrid}
+								className="h-9 cursor-pointer gap-1.5 text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
+							>
+								<Trash2 className="h-4 w-4" />
+								<span>Eliminar Galería</span>
+							</Button>
+							<DialogClose asChild>
+								<Button
+									type="button"
+									className="h-9 cursor-pointer"
+								>
+									Listo
+								</Button>
+							</DialogClose>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+			)}
+
+			{/* Grid display layout */}
+			<NodeViewContent
+				className={cn(
+					'w-full',
+					isEditable && currentImages.length === 0 && 'hidden',
+				)}
+			/>
+			{/* Image Cropper Modal */}
+			{croppingImage && (
+				<ImageCropperDialog
+					src={croppingImage.src}
+					isOpen={croppingImage !== null}
+					onOpenChange={(open) => {
+						if (!open) {
+							setCroppingImage(null);
+						}
+					}}
+					onCrop={async (blob) => {
+						await handleCropImage(
+							croppingImage.offset,
+							croppingImage.nodeSize,
+							blob,
+						);
+						setCroppingImage(null);
+					}}
+				/>
+			)}
+		</NodeViewWrapper>
+	);
 }
 
 export interface ImageCropperDialogProps {
-    src: string;
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    onCrop: (croppedBlob: Blob) => Promise<void>;
+	src: string;
+	isOpen: boolean;
+	onOpenChange: (open: boolean) => void;
+	onCrop: (croppedBlob: Blob) => Promise<void>;
 }
 
 export function ImageCropperDialog({
-    src,
-    isOpen,
-    onOpenChange,
-    onCrop,
+	src,
+	isOpen,
+	onOpenChange,
+	onCrop,
 }: ImageCropperDialogProps) {
-    const [crop, setCrop] = useState({ x: 10, y: 10, w: 80, h: 80 });
-    const [aspectRatio, setAspectRatio] = useState<string>('free');
-    const [imageRect, setImageRect] = useState<{
-        width: number;
-        height: number;
-    } | null>(null);
-    const [naturalWidth, setNaturalWidth] = useState<number>(0);
-    const [naturalHeight, setNaturalHeight] = useState<number>(0);
-    const [isCropping, setIsCropping] = useState(false);
+	const [crop, setCrop] = useState({ x: 10, y: 10, w: 80, h: 80 });
+	const [aspectRatio, setAspectRatio] = useState<string>('free');
+	const [imageRect, setImageRect] = useState<{
+		width: number;
+		height: number;
+	} | null>(null);
+	const [naturalWidth, setNaturalWidth] = useState<number>(0);
+	const [naturalHeight, setNaturalHeight] = useState<number>(0);
+	const [isCropping, setIsCropping] = useState(false);
 
-    const imageRef = useRef<HTMLImageElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
+	const imageRef = useRef<HTMLImageElement>(null);
+	const containerRef = useRef<HTMLDivElement>(null);
 
-    const [dragState, setDragState] = useState<{
-        action: string | null;
-        startX: number;
-        startY: number;
-        startCrop: { x: number; y: number; w: number; h: number };
-        rectWidth: number;
-        rectHeight: number;
-    }>({
-        action: null,
-        startX: 0,
-        startY: 0,
-        startCrop: { x: 0, y: 0, w: 0, h: 0 },
-        rectWidth: 0,
-        rectHeight: 0,
-    });
+	const [dragState, setDragState] = useState<{
+		action: string | null;
+		startX: number;
+		startY: number;
+		startCrop: { x: number; y: number; w: number; h: number };
+		rectWidth: number;
+		rectHeight: number;
+	}>({
+		action: null,
+		startX: 0,
+		startY: 0,
+		startCrop: { x: 0, y: 0, w: 0, h: 0 },
+		rectWidth: 0,
+		rectHeight: 0,
+	});
 
-    // Reset crop state on open/src change
-    useEffect(() => {
-        if (isOpen) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setCrop({ x: 10, y: 10, w: 80, h: 80 });
-            setAspectRatio('free');
-            setImageRect(null);
-        }
-    }, [isOpen, src]);
+	// Reset crop state on open/src change
+	useEffect(() => {
+		if (isOpen) {
+			// eslint-disable-next-line react-hooks/set-state-in-effect
+			setCrop({ x: 10, y: 10, w: 80, h: 80 });
+			setAspectRatio('free');
+			setImageRect(null);
+		}
+	}, [isOpen, src]);
 
-    const handleImageLoad = () => {
-        if (imageRef.current) {
-            setImageRect({
-                width: imageRef.current.clientWidth,
-                height: imageRef.current.clientHeight,
-            });
-            setNaturalWidth(imageRef.current.naturalWidth);
-            setNaturalHeight(imageRef.current.naturalHeight);
-        }
-    };
+	const handleImageLoad = () => {
+		if (imageRef.current) {
+			setImageRect({
+				width: imageRef.current.clientWidth,
+				height: imageRef.current.clientHeight,
+			});
+			setNaturalWidth(imageRef.current.naturalWidth);
+			setNaturalHeight(imageRef.current.naturalHeight);
+		}
+	};
 
-    const handleAspectRatioChange = (ratio: string) => {
-        setAspectRatio(ratio);
+	const handleAspectRatioChange = (ratio: string) => {
+		setAspectRatio(ratio);
 
-        if (ratio === 'free') {
-            return;
-        }
+		if (ratio === 'free') {
+			return;
+		}
 
-        const ratioValue =
-            ratio === '1:1' ? 1 : ratio === '4:3' ? 4 / 3 : 16 / 9;
-        const imgRatio = naturalWidth / naturalHeight;
-        const targetWToHRatio = ratioValue / imgRatio;
+		const ratioValue =
+			ratio === '1:1' ? 1 : ratio === '4:3' ? 4 / 3 : 16 / 9;
+		const imgRatio = naturalWidth / naturalHeight;
+		const targetWToHRatio = ratioValue / imgRatio;
 
-        let w = 80;
-        let h = 80 / targetWToHRatio;
+		let w = 80;
+		let h = 80 / targetWToHRatio;
 
-        if (h > 80) {
-            h = 80;
-            w = 80 * targetWToHRatio;
-        }
+		if (h > 80) {
+			h = 80;
+			w = 80 * targetWToHRatio;
+		}
 
-        setCrop({
-            x: (100 - w) / 2,
-            y: (100 - h) / 2,
-            w,
-            h,
-        });
-    };
+		setCrop({
+			x: (100 - w) / 2,
+			y: (100 - h) / 2,
+			w,
+			h,
+		});
+	};
 
-    const handlePointerDown = (e: React.PointerEvent, action: string) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const container = containerRef.current;
+	const handlePointerDown = (e: React.PointerEvent, action: string) => {
+		e.preventDefault();
+		e.stopPropagation();
+		const container = containerRef.current;
 
-        if (!container) {
-            return;
-        }
+		if (!container) {
+			return;
+		}
 
-        const rect = container.getBoundingClientRect();
-        setDragState({
-            action,
-            startX: e.clientX,
-            startY: e.clientY,
-            startCrop: { ...crop },
-            rectWidth: rect.width,
-            rectHeight: rect.height,
-        });
+		const rect = container.getBoundingClientRect();
+		setDragState({
+			action,
+			startX: e.clientX,
+			startY: e.clientY,
+			startCrop: { ...crop },
+			rectWidth: rect.width,
+			rectHeight: rect.height,
+		});
 
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    };
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+	};
 
-    const handlePointerMove = (e: React.PointerEvent) => {
-        if (!dragState.action) {
-            return;
-        }
+	const handlePointerMove = (e: React.PointerEvent) => {
+		if (!dragState.action) {
+			return;
+		}
 
-        const dx = ((e.clientX - dragState.startX) / dragState.rectWidth) * 100;
-        const dy =
-            ((e.clientY - dragState.startY) / dragState.rectHeight) * 100;
+		const dx = ((e.clientX - dragState.startX) / dragState.rectWidth) * 100;
+		const dy =
+			((e.clientY - dragState.startY) / dragState.rectHeight) * 100;
 
-        const newCrop = { ...dragState.startCrop };
+		const newCrop = { ...dragState.startCrop };
 
-        if (dragState.action === 'move') {
-            newCrop.x = Math.max(0, Math.min(100 - newCrop.w, newCrop.x + dx));
-            newCrop.y = Math.max(0, Math.min(100 - newCrop.h, newCrop.y + dy));
-        } else {
-            let left = newCrop.x;
-            let top = newCrop.y;
-            let right = newCrop.x + newCrop.w;
-            let bottom = newCrop.y + newCrop.h;
+		if (dragState.action === 'move') {
+			newCrop.x = Math.max(0, Math.min(100 - newCrop.w, newCrop.x + dx));
+			newCrop.y = Math.max(0, Math.min(100 - newCrop.h, newCrop.y + dy));
+		} else {
+			let left = newCrop.x;
+			let top = newCrop.y;
+			let right = newCrop.x + newCrop.w;
+			let bottom = newCrop.y + newCrop.h;
 
-            if (dragState.action.includes('w')) {
-                left = Math.max(0, Math.min(right - 10, left + dx));
-            }
+			if (dragState.action.includes('w')) {
+				left = Math.max(0, Math.min(right - 10, left + dx));
+			}
 
-            if (dragState.action.includes('e')) {
-                right = Math.max(left + 10, Math.min(100, right + dx));
-            }
+			if (dragState.action.includes('e')) {
+				right = Math.max(left + 10, Math.min(100, right + dx));
+			}
 
-            if (dragState.action.includes('n')) {
-                top = Math.max(0, Math.min(bottom - 10, top + dy));
-            }
+			if (dragState.action.includes('n')) {
+				top = Math.max(0, Math.min(bottom - 10, top + dy));
+			}
 
-            if (dragState.action.includes('s')) {
-                bottom = Math.max(top + 10, Math.min(100, bottom + dy));
-            }
+			if (dragState.action.includes('s')) {
+				bottom = Math.max(top + 10, Math.min(100, bottom + dy));
+			}
 
-            newCrop.x = left;
-            newCrop.y = top;
-            newCrop.w = right - left;
-            newCrop.h = bottom - top;
+			newCrop.x = left;
+			newCrop.y = top;
+			newCrop.w = right - left;
+			newCrop.h = bottom - top;
 
-            if (aspectRatio !== 'free') {
-                const ratioValue =
-                    aspectRatio === '1:1'
-                        ? 1
-                        : aspectRatio === '4:3'
-                          ? 4 / 3
-                          : 16 / 9;
-                const imgRatio = naturalWidth / naturalHeight;
-                const targetWToHRatio = ratioValue / imgRatio;
+			if (aspectRatio !== 'free') {
+				const ratioValue =
+					aspectRatio === '1:1'
+						? 1
+						: aspectRatio === '4:3'
+							? 4 / 3
+							: 16 / 9;
+				const imgRatio = naturalWidth / naturalHeight;
+				const targetWToHRatio = ratioValue / imgRatio;
 
-                if (
-                    dragState.action.includes('e') ||
-                    dragState.action.includes('w')
-                ) {
-                    newCrop.h = newCrop.w / targetWToHRatio;
+				if (
+					dragState.action.includes('e') ||
+					dragState.action.includes('w')
+				) {
+					newCrop.h = newCrop.w / targetWToHRatio;
 
-                    if (top + newCrop.h > 100) {
-                        newCrop.h = 100 - top;
-                        newCrop.w = newCrop.h * targetWToHRatio;
-                    }
-                } else {
-                    newCrop.w = newCrop.h * targetWToHRatio;
+					if (top + newCrop.h > 100) {
+						newCrop.h = 100 - top;
+						newCrop.w = newCrop.h * targetWToHRatio;
+					}
+				} else {
+					newCrop.w = newCrop.h * targetWToHRatio;
 
-                    if (left + newCrop.w > 100) {
-                        newCrop.w = 100 - left;
-                        newCrop.h = newCrop.w / targetWToHRatio;
-                    }
-                }
-            }
-        }
+					if (left + newCrop.w > 100) {
+						newCrop.w = 100 - left;
+						newCrop.h = newCrop.w / targetWToHRatio;
+					}
+				}
+			}
+		}
 
-        setCrop(newCrop);
-    };
+		setCrop(newCrop);
+	};
 
-    const handlePointerUp = (e: React.PointerEvent) => {
-        if (!dragState.action) {
-            return;
-        }
+	const handlePointerUp = (e: React.PointerEvent) => {
+		if (!dragState.action) {
+			return;
+		}
 
-        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-        setDragState({
-            action: null,
-            startX: 0,
-            startY: 0,
-            startCrop: { x: 0, y: 0, w: 0, h: 0 },
-            rectWidth: 0,
-            rectHeight: 0,
-        });
-    };
+		(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+		setDragState({
+			action: null,
+			startX: 0,
+			startY: 0,
+			startCrop: { x: 0, y: 0, w: 0, h: 0 },
+			rectWidth: 0,
+			rectHeight: 0,
+		});
+	};
 
-    const handleCropConfirm = async () => {
-        setIsCropping(true);
+	const handleCropConfirm = async () => {
+		setIsCropping(true);
 
-        try {
-            const image = new Image();
-            image.crossOrigin = 'anonymous';
+		try {
+			const image = new Image();
+			image.crossOrigin = 'anonymous';
 
-            let finalSrc = src;
+			let finalSrc = src;
 
-            try {
-                if (src.startsWith('http://') || src.startsWith('https://')) {
-                    const urlObj = new URL(src);
-                    finalSrc = urlObj.pathname + urlObj.search + urlObj.hash;
-                }
-            } catch (e) {
-                console.error('Failed to parse src URL', e);
-            }
+			try {
+				if (src.startsWith('http://') || src.startsWith('https://')) {
+					const urlObj = new URL(src);
+					finalSrc = urlObj.pathname + urlObj.search + urlObj.hash;
+				}
+			} catch (e) {
+				console.error('Failed to parse src URL', e);
+			}
 
-            image.src = finalSrc;
-            await new Promise((resolve, reject) => {
-                image.onload = resolve;
-                image.onerror = reject;
-            });
+			image.src = finalSrc;
+			await new Promise((resolve, reject) => {
+				image.onload = resolve;
+				image.onerror = reject;
+			});
 
-            const canvas = document.createElement('canvas');
-            const cropX = (crop.x / 100) * image.naturalWidth;
-            const cropY = (crop.y / 100) * image.naturalHeight;
-            const cropW = (crop.w / 100) * image.naturalWidth;
-            const cropH = (crop.h / 100) * image.naturalHeight;
+			const canvas = document.createElement('canvas');
+			const cropX = (crop.x / 100) * image.naturalWidth;
+			const cropY = (crop.y / 100) * image.naturalHeight;
+			const cropW = (crop.w / 100) * image.naturalWidth;
+			const cropH = (crop.h / 100) * image.naturalHeight;
 
-            canvas.width = cropW;
-            canvas.height = cropH;
+			canvas.width = cropW;
+			canvas.height = cropH;
 
-            const ctx = canvas.getContext('2d');
+			const ctx = canvas.getContext('2d');
 
-            if (!ctx) {
-                throw new Error('Could not get canvas context');
-            }
+			if (!ctx) {
+				throw new Error('Could not get canvas context');
+			}
 
-            ctx.drawImage(
-                image,
-                cropX,
-                cropY,
-                cropW,
-                cropH,
-                0,
-                0,
-                cropW,
-                cropH,
-            );
+			ctx.drawImage(
+				image,
+				cropX,
+				cropY,
+				cropW,
+				cropH,
+				0,
+				0,
+				cropW,
+				cropH,
+			);
 
-            canvas.toBlob(
-                async (blob) => {
-                    if (!blob) {
-                        toast.error('Error al generar el recorte');
-                        setIsCropping(false);
+			canvas.toBlob(
+				async (blob) => {
+					if (!blob) {
+						toast.error('Error al generar el recorte');
+						setIsCropping(false);
 
-                        return;
-                    }
+						return;
+					}
 
-                    await onCrop(blob);
-                    setIsCropping(false);
-                    onOpenChange(false);
-                },
-                'image/jpeg',
-                0.9,
-            );
-        } catch (err) {
-            console.error(err);
-            toast.error('Error al procesar el recorte de la imagen');
-            setIsCropping(false);
-        }
-    };
+					await onCrop(blob);
+					setIsCropping(false);
+					onOpenChange(false);
+				},
+				'image/jpeg',
+				0.9,
+			);
+		} catch (err) {
+			console.error(err);
+			toast.error('Error al procesar el recorte de la imagen');
+			setIsCropping(false);
+		}
+	};
 
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Crop className="h-5 w-5 text-indigo-500" />
-                        <span>Recortar Imagen</span>
-                    </DialogTitle>
-                </DialogHeader>
+	return (
+		<Dialog open={isOpen} onOpenChange={onOpenChange}>
+			<DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
+				<DialogHeader>
+					<DialogTitle className="flex items-center gap-2">
+						<Crop className="h-5 w-5 text-indigo-500" />
+						<span>Recortar Imagen</span>
+					</DialogTitle>
+				</DialogHeader>
 
-                <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-4">
-                    {/* Aspect Ratio Presets */}
-                    <div className="mb-4 flex w-full justify-center gap-2">
-                        {[
-                            { label: 'Libre', value: 'free' },
-                            { label: '1:1 (Cuadrado)', value: '1:1' },
-                            { label: '4:3', value: '4:3' },
-                            { label: '16:9', value: '16:9' },
-                        ].map((preset) => (
-                            <Button
-                                key={preset.value}
-                                type="button"
-                                variant={
-                                    aspectRatio === preset.value
-                                        ? 'default'
-                                        : 'outline'
-                                }
-                                size="sm"
-                                onClick={() =>
-                                    handleAspectRatioChange(preset.value)
-                                }
-                                className="h-8 cursor-pointer text-xs font-semibold"
-                            >
-                                {preset.label}
-                            </Button>
-                        ))}
-                    </div>
+				<div className="flex min-h-0 flex-1 flex-col items-center justify-center py-4">
+					{/* Aspect Ratio Presets */}
+					<div className="mb-4 flex w-full justify-center gap-2">
+						{[
+							{ label: 'Libre', value: 'free' },
+							{ label: '1:1 (Cuadrado)', value: '1:1' },
+							{ label: '4:3', value: '4:3' },
+							{ label: '16:9', value: '16:9' },
+						].map((preset) => (
+							<Button
+								key={preset.value}
+								type="button"
+								variant={
+									aspectRatio === preset.value
+										? 'default'
+										: 'outline'
+								}
+								size="sm"
+								onClick={() =>
+									handleAspectRatioChange(preset.value)
+								}
+								className="h-8 cursor-pointer text-xs font-semibold"
+							>
+								{preset.label}
+							</Button>
+						))}
+					</div>
 
-                    {/* Work Canvas Container */}
-                    <div className="relative flex min-h-[300px] max-w-full flex-1 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-950/5 p-4 dark:border-slate-800 dark:bg-slate-950/40">
-                        <div className="relative inline-block max-h-[50vh] overflow-hidden select-none">
-                            <img
-                                ref={imageRef}
-                                src={src}
-                                onLoad={handleImageLoad}
-                                alt="To crop"
-                                className="pointer-events-none max-h-[50vh] max-w-full object-contain select-none"
-                            />
-                            {imageRect && (
-                                <div
-                                    ref={containerRef}
-                                    className="absolute top-0 left-0 touch-none select-none"
-                                    style={{
-                                        width: imageRect.width,
-                                        height: imageRect.height,
-                                    }}
-                                    onPointerMove={handlePointerMove}
-                                >
-                                    {/* Shaded boundaries */}
-                                    <div
-                                        className="pointer-events-none absolute z-10 bg-black/50"
-                                        style={{
-                                            top: 0,
-                                            left: 0,
-                                            right: 0,
-                                            height: `${crop.y}%`,
-                                        }}
-                                    />
-                                    <div
-                                        className="pointer-events-none absolute z-10 bg-black/50"
-                                        style={{
-                                            bottom: 0,
-                                            left: 0,
-                                            right: 0,
-                                            top: `${crop.y + crop.h}%`,
-                                        }}
-                                    />
-                                    <div
-                                        className="pointer-events-none absolute z-10 bg-black/50"
-                                        style={{
-                                            left: 0,
-                                            top: `${crop.y}%`,
-                                            height: `${crop.h}%`,
-                                            width: `${crop.x}%`,
-                                        }}
-                                    />
-                                    <div
-                                        className="pointer-events-none absolute z-10 bg-black/50"
-                                        style={{
-                                            right: 0,
-                                            top: `${crop.y}%`,
-                                            height: `${crop.h}%`,
-                                            left: `${crop.x + crop.w}%`,
-                                        }}
-                                    />
+					{/* Work Canvas Container */}
+					<div className="relative flex min-h-[300px] max-w-full flex-1 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-950/5 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+						<div className="relative inline-block max-h-[50vh] overflow-hidden select-none">
+							<img
+								ref={imageRef}
+								src={src}
+								onLoad={handleImageLoad}
+								alt="To crop"
+								className="pointer-events-none max-h-[50vh] max-w-full object-contain select-none"
+							/>
+							{imageRect && (
+								<div
+									ref={containerRef}
+									className="absolute top-0 left-0 touch-none select-none"
+									style={{
+										width: imageRect.width,
+										height: imageRect.height,
+									}}
+									onPointerMove={handlePointerMove}
+								>
+									{/* Shaded boundaries */}
+									<div
+										className="pointer-events-none absolute z-10 bg-black/50"
+										style={{
+											top: 0,
+											left: 0,
+											right: 0,
+											height: `${crop.y}%`,
+										}}
+									/>
+									<div
+										className="pointer-events-none absolute z-10 bg-black/50"
+										style={{
+											bottom: 0,
+											left: 0,
+											right: 0,
+											top: `${crop.y + crop.h}%`,
+										}}
+									/>
+									<div
+										className="pointer-events-none absolute z-10 bg-black/50"
+										style={{
+											left: 0,
+											top: `${crop.y}%`,
+											height: `${crop.h}%`,
+											width: `${crop.x}%`,
+										}}
+									/>
+									<div
+										className="pointer-events-none absolute z-10 bg-black/50"
+										style={{
+											right: 0,
+											top: `${crop.y}%`,
+											height: `${crop.h}%`,
+											left: `${crop.x + crop.w}%`,
+										}}
+									/>
 
-                                    {/* Crop Box Selector */}
-                                    <div
-                                        className="absolute z-20 cursor-move border-2 border-dashed border-white"
-                                        style={{
-                                            left: `${crop.x}%`,
-                                            top: `${crop.y}%`,
-                                            width: `${crop.w}%`,
-                                            height: `${crop.h}%`,
-                                        }}
-                                        onPointerDown={(e) =>
-                                            handlePointerDown(e, 'move')
-                                        }
-                                        onPointerUp={handlePointerUp}
-                                    >
-                                        {/* Grid gridlines */}
-                                        <div className="pointer-events-none absolute inset-0 border border-white/20">
-                                            <div className="absolute inset-y-0 right-1/3 left-1/3 border-x border-dashed border-white/30" />
-                                            <div className="absolute inset-x-0 top-1/3 bottom-1/3 border-y border-dashed border-white/30" />
-                                        </div>
+									{/* Crop Box Selector */}
+									<div
+										className="absolute z-20 cursor-move border-2 border-dashed border-white"
+										style={{
+											left: `${crop.x}%`,
+											top: `${crop.y}%`,
+											width: `${crop.w}%`,
+											height: `${crop.h}%`,
+										}}
+										onPointerDown={(e) =>
+											handlePointerDown(e, 'move')
+										}
+										onPointerUp={handlePointerUp}
+									>
+										{/* Grid gridlines */}
+										<div className="pointer-events-none absolute inset-0 border border-white/20">
+											<div className="absolute inset-y-0 right-1/3 left-1/3 border-x border-dashed border-white/30" />
+											<div className="absolute inset-x-0 top-1/3 bottom-1/3 border-y border-dashed border-white/30" />
+										</div>
 
-                                        {/* Corners */}
-                                        <div
-                                            className="absolute -top-1.5 -left-1.5 h-3 w-3 cursor-nwse-resize rounded-full border border-white bg-indigo-500 transition-transform hover:scale-125"
-                                            onPointerDown={(e) =>
-                                                handlePointerDown(e, 'nw')
-                                            }
-                                            onPointerUp={handlePointerUp}
-                                        />
-                                        <div
-                                            className="absolute -top-1.5 -right-1.5 h-3 w-3 cursor-nesw-resize rounded-full border border-white bg-indigo-500 transition-transform hover:scale-125"
-                                            onPointerDown={(e) =>
-                                                handlePointerDown(e, 'ne')
-                                            }
-                                            onPointerUp={handlePointerUp}
-                                        />
-                                        <div
-                                            className="absolute -right-1.5 -bottom-1.5 h-3 w-3 cursor-nwse-resize rounded-full border border-white bg-indigo-500 transition-transform hover:scale-125"
-                                            onPointerDown={(e) =>
-                                                handlePointerDown(e, 'se')
-                                            }
-                                            onPointerUp={handlePointerUp}
-                                        />
-                                        <div
-                                            className="absolute -bottom-1.5 -left-1.5 h-3 w-3 cursor-nesw-resize rounded-full border border-white bg-indigo-500 transition-transform hover:scale-125"
-                                            onPointerDown={(e) =>
-                                                handlePointerDown(e, 'sw')
-                                            }
-                                            onPointerUp={handlePointerUp}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+										{/* Corners */}
+										<div
+											className="absolute -top-1.5 -left-1.5 h-3 w-3 cursor-nwse-resize rounded-full border border-white bg-indigo-500 transition-transform hover:scale-125"
+											onPointerDown={(e) =>
+												handlePointerDown(e, 'nw')
+											}
+											onPointerUp={handlePointerUp}
+										/>
+										<div
+											className="absolute -top-1.5 -right-1.5 h-3 w-3 cursor-nesw-resize rounded-full border border-white bg-indigo-500 transition-transform hover:scale-125"
+											onPointerDown={(e) =>
+												handlePointerDown(e, 'ne')
+											}
+											onPointerUp={handlePointerUp}
+										/>
+										<div
+											className="absolute -right-1.5 -bottom-1.5 h-3 w-3 cursor-nwse-resize rounded-full border border-white bg-indigo-500 transition-transform hover:scale-125"
+											onPointerDown={(e) =>
+												handlePointerDown(e, 'se')
+											}
+											onPointerUp={handlePointerUp}
+										/>
+										<div
+											className="absolute -bottom-1.5 -left-1.5 h-3 w-3 cursor-nesw-resize rounded-full border border-white bg-indigo-500 transition-transform hover:scale-125"
+											onPointerDown={(e) =>
+												handlePointerDown(e, 'sw')
+											}
+											onPointerUp={handlePointerUp}
+										/>
+									</div>
+								</div>
+							)}
+						</div>
+					</div>
+				</div>
 
-                <DialogFooter className="flex justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-900">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={isCropping}
-                        onClick={() => onOpenChange(false)}
-                        className="h-9 cursor-pointer"
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        type="button"
-                        disabled={isCropping}
-                        onClick={handleCropConfirm}
-                        className="h-9 cursor-pointer bg-indigo-600 text-white hover:bg-indigo-700"
-                    >
-                        {isCropping ? 'Procesando...' : 'Aplicar Recorte'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
+				<DialogFooter className="flex justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-900">
+					<Button
+						type="button"
+						variant="outline"
+						disabled={isCropping}
+						onClick={() => onOpenChange(false)}
+						className="h-9 cursor-pointer"
+					>
+						Cancelar
+					</Button>
+					<Button
+						type="button"
+						disabled={isCropping}
+						onClick={handleCropConfirm}
+						className="h-9 cursor-pointer bg-indigo-600 text-white hover:bg-indigo-700"
+					>
+						{isCropping ? 'Procesando...' : 'Aplicar Recorte'}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	);
 }

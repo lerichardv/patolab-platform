@@ -165,6 +165,10 @@ export default function SpecimenForm({
     const products = propProducts || formContext?.products || [];
     const banks = propBanks || formContext?.banks || [];
     const { props: pageProps } = usePage<any>();
+    const canManageStatus = Boolean(
+        pageProps.auth?.user?.role?.slug === 'admin' ||
+        pageProps.auth?.permissions?.includes('specimens.manage_status'),
+    );
     const flash = pageProps.flash as Record<string, any> | undefined;
     const [availableTemplates, setAvailableTemplates] = React.useState<any[]>(
         [],
@@ -343,6 +347,7 @@ export default function SpecimenForm({
         const indCust =
             initialInvoice?.individual_customer ||
             initialInvoice?.individualCustomer;
+
         if (indCust) {
             return {
                 id: indCust.id,
@@ -356,6 +361,7 @@ export default function SpecimenForm({
                 age_unit: indCust.age_unit,
             };
         }
+
         return null;
     }, [initialInvoice]);
 
@@ -480,6 +486,7 @@ export default function SpecimenForm({
             );
 
             const initialIds = new Set<string>();
+
             if (
                 Array.isArray(specimen.examinations) &&
                 specimen.examinations.length > 0
@@ -490,38 +497,45 @@ export default function SpecimenForm({
                     }
                 });
             }
+
             if (
                 Array.isArray(specimen.specimen_examinations) &&
                 specimen.specimen_examinations.length > 0
             ) {
                 specimen.specimen_examinations.forEach((se: any) => {
                     const id = se.examination_id || se.id || se.examination?.id;
+
                     if (id) {
                         initialIds.add(String(id));
                     }
                 });
             }
+
             if (
                 Array.isArray(specimen.specimenExaminations) &&
                 specimen.specimenExaminations.length > 0
             ) {
                 specimen.specimenExaminations.forEach((se: any) => {
                     const id = se.examination_id || se.id || se.examination?.id;
+
                     if (id) {
                         initialIds.add(String(id));
                     }
                 });
             }
+
             if (Array.isArray(invItems) && invItems.length > 0) {
                 invItems.forEach((item: any) => {
                     if (!item.specimen_id || item.specimen_id === specimen.id) {
                         const id = item.examination_id || item.examination?.id;
+
                         if (id) {
                             initialIds.add(String(id));
                         }
                     }
                 });
             }
+
             if (initialIds.size === 0 && specimen.specimen_type_examination) {
                 initialIds.add(String(specimen.specimen_type_examination));
             }
@@ -2563,15 +2577,7 @@ export default function SpecimenForm({
                                                                                 t.id.toString(),
                                                                             status: !specimen
                                                                                 ? initialStatus
-                                                                                : activeStates.some(
-                                                                                        (
-                                                                                            s: any,
-                                                                                        ) =>
-                                                                                            s.status ===
-                                                                                            d.status,
-                                                                                    )
-                                                                                  ? d.status
-                                                                                  : initialStatus,
+                                                                                : d.status,
                                                                             selected_examination_ids:
                                                                                 [],
                                                                             specimen_type_examination:
@@ -3351,6 +3357,7 @@ export default function SpecimenForm({
                                     placeholder="Seleccionar estado"
                                     value={data.status}
                                     onChange={(v) => setData('status', v)}
+                                    disabled={!canManageStatus}
                                     options={availableStatuses.map(
                                         (s, idx) => ({
                                             label: s.label,
@@ -3358,10 +3365,18 @@ export default function SpecimenForm({
                                             color: s.color,
                                             disabled: !specimen
                                                 ? idx !== 0
-                                                : data.status !== s.value,
+                                                : !canManageStatus
+                                                  ? data.status !== s.value
+                                                  : false,
                                         }),
                                     )}
                                 />
+                                {!canManageStatus && (
+                                    <p className="text-xs text-muted-foreground">
+                                        El estado solo puede ser modificado por
+                                        roles autorizados.
+                                    </p>
+                                )}
                                 {errors.status && (
                                     <p className="text-sm text-destructive">
                                         {errors.status}

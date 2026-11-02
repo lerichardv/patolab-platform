@@ -61,6 +61,7 @@ export default function CancelSpecimenDialog({
                 onSuccess: () => {
                     toast.success('Muestra cancelada correctamente');
                     onClose();
+                    router.reload({ only: ['priorities'] });
                 },
                 onError: () => {
                     toast.error('Error al cancelar la muestra');

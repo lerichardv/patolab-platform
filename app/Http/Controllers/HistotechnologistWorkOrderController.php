@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\WorkOrderUpdated;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\WorkOrder;
@@ -114,13 +115,49 @@ class HistotechnologistWorkOrderController extends Controller
             ->get();
 
         // Sorting
-        $sortField = $request->get('sort_field');
-        $sortDirection = $request->get('sort_direction', 'asc');
+        $sortField = $request->get('sort_field', 'created_at');
+        $sortDirection = strtolower((string) $request->get('sort_direction', 'desc'));
+        if (! in_array($sortDirection, ['asc', 'desc'], true)) {
+            $sortDirection = 'desc';
+        }
 
         if ($sortField === 'due_date') {
+            $resolveDueDate = function ($wo) {
+                if ($wo->due_date) {
+                    return $wo->due_date->timestamp;
+                }
+
+                $target = $wo->task ?: ($wo->types && $wo->types->isNotEmpty() ? $wo->types->first() : null);
+                if ($target && $wo->created_at && $target->duration_unit && $target->duration_value) {
+                    $createdAt = $wo->created_at->copy();
+                    if ($target->same_day_rule_enabled && $target->same_day_cutoff_start && $target->same_day_cutoff_end) {
+                        $time = $createdAt->format('H:i:s');
+                        if ($time >= $target->same_day_cutoff_start && $time <= $target->same_day_cutoff_end) {
+                            return $createdAt->endOfDay()->timestamp;
+                        }
+                    }
+
+                    if ($target->duration_unit === 'hours') {
+                        $due = $createdAt->copy();
+                        for ($i = 0; $i < $target->duration_value; $i++) {
+                            $due->addHour();
+                            while ($due->isWeekend()) {
+                                $due->addDay();
+                            }
+                        }
+
+                        return $due->timestamp;
+                    }
+
+                    return $createdAt->copy()->addWeekdays($target->duration_value)->timestamp;
+                }
+
+                return null;
+            };
+
             $workOrders = $sortDirection === 'desc'
-                ? $workOrders->sortByDesc(fn ($wo) => $wo->due_date ? $wo->due_date->timestamp : 0)
-                : $workOrders->sortBy(fn ($wo) => $wo->due_date ? $wo->due_date->timestamp : PHP_INT_MAX);
+                ? $workOrders->sortByDesc(fn ($wo) => $resolveDueDate($wo) ?? 0)
+                : $workOrders->sortBy(fn ($wo) => $resolveDueDate($wo) ?? PHP_INT_MAX);
         } elseif ($sortField === 'task') {
             $workOrders = $sortDirection === 'desc'
                 ? $workOrders->sortByDesc(fn ($wo) => optional($wo->task)->name ?? '')
@@ -129,12 +166,34 @@ class HistotechnologistWorkOrderController extends Controller
             $workOrders = $sortDirection === 'desc'
                 ? $workOrders->sortByDesc(fn ($wo) => optional($wo->type)->name ?? '')
                 : $workOrders->sortBy(fn ($wo) => optional($wo->type)->name ?? '');
+        } elseif ($sortField === 'id') {
+            $workOrders = $sortDirection === 'desc'
+                ? $workOrders->sortByDesc('id')
+                : $workOrders->sortBy('id');
+        } elseif ($sortField === 'priority') {
+            $workOrders = $sortDirection === 'desc'
+                ? $workOrders->sortByDesc('priority')
+                : $workOrders->sortBy('priority');
+        } elseif ($sortField === 'status') {
+            $workOrders = $sortDirection === 'desc'
+                ? $workOrders->sortByDesc('status')
+                : $workOrders->sortBy('status');
+        } elseif ($sortField === 'quantity') {
+            $workOrders = $sortDirection === 'desc'
+                ? $workOrders->sortByDesc('quantity')
+                : $workOrders->sortBy('quantity');
         } else {
-            // Default sorting: priority asc, then due_date asc
-            $workOrders = $workOrders->sortBy([
-                ['priority', 'asc'],
-                ['due_date', 'asc'],
-            ]);
+            // Default: created_at desc (or asc)
+            $sortField = 'created_at';
+            $workOrders = $sortDirection === 'asc'
+                ? $workOrders->sortBy([
+                    ['created_at', 'asc'],
+                    ['id', 'asc'],
+                ])
+                : $workOrders->sortBy([
+                    ['created_at', 'desc'],
+                    ['id', 'desc'],
+                ]);
         }
 
         $workOrders = $workOrders->values();
@@ -180,8 +239,11 @@ class HistotechnologistWorkOrderController extends Controller
 
         // If work_order's user_id is null, set this one as the primary technician
         if (is_null($workOrder->user_id)) {
-            $workOrder->update(['user_id' => $validated['user_id']]);
+            $workOrder->user_id = $validated['user_id'];
+            $workOrder->saveQuietly();
         }
+
+        WorkOrderUpdated::dispatch($workOrder->id, 'assigned');
 
         return redirect()->back()->with('success', 'Técnico asignado correctamente.');
     }
@@ -204,8 +266,11 @@ class HistotechnologistWorkOrderController extends Controller
         // If the primary technician is the one being detached, update user_id to the next remaining, or null
         if ($workOrder->user_id === $user->id) {
             $nextUser = $workOrder->users()->first();
-            $workOrder->update(['user_id' => $nextUser?->id]);
+            $workOrder->user_id = $nextUser?->id;
+            $workOrder->saveQuietly();
         }
+
+        WorkOrderUpdated::dispatch($workOrder->id, 'unassigned');
 
         return redirect()->back()->with('success', 'Técnico desasignado correctamente.');
     }

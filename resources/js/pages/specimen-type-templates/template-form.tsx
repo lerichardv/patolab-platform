@@ -423,6 +423,7 @@ export default function TemplateForm({
             if (!val) {
                 return null;
             }
+
             const unlinked = removeHyperlinks(val);
             const cleanText = unlinked
                 .replace(
@@ -432,6 +433,7 @@ export default function TemplateForm({
                 .replace(/&nbsp;|\xc2\xa0/gi, ' ')
                 .trim();
             const hasMedia = /<img|<table|<figure/i.test(unlinked);
+
             if (!cleanText && !hasMedia) {
                 return null;
             }

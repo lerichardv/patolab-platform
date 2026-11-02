@@ -1101,12 +1101,16 @@ export default function ReportWorkspace({
         // If the report in the database originally had substantive text in any main section,
         // but now ALL main sections are completely empty, abort the save to prevent accidental wiping.
         const isFieldEmpty = (html: string | undefined | null) => {
-            if (!html) return true;
+            if (!html) {
+return true;
+}
+
             const stripped = html
                 .replace(/<[^>]*>/g, '')
                 .replace(/&nbsp;/gi, ' ')
                 .trim();
             const hasMedia = /<img|<table/i.test(html);
+
             return stripped === '' && !hasMedia;
         };
 
@@ -1131,6 +1135,7 @@ export default function ReportWorkspace({
             toast.error(
                 'Protección de datos: Se detectó contenido en blanco inesperado. Se bloqueó la sobrescritura del reporte.',
             );
+
             return Promise.reject(
                 new Error(
                     'Protección de datos: Se detectó contenido en blanco inesperado.',

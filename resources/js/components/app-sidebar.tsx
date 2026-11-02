@@ -109,6 +109,7 @@ const mainNavItems: NavItem[] = [
         href: specimensIndex(),
         icon: Microscope,
         permission: 'specimens.view',
+        prefetch: false,
     },
     {
         title: 'Mis Asignaciones',

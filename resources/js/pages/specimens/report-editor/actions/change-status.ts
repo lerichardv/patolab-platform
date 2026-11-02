@@ -25,5 +25,18 @@ export async function updateSpecimenStatus(
 ): Promise<ChangeSpecimenStatusResponse> {
     const url = changeStatus.url(specimenId);
 
-    return postJson<ChangeSpecimenStatusResponse>(url, payload);
+    const response = await postJson<ChangeSpecimenStatusResponse>(url, payload);
+
+    if (response?.success && typeof window !== 'undefined') {
+        try {
+            window.localStorage.setItem(
+                'patolab_specimens_updated_at',
+                Date.now().toString(),
+            );
+        } catch {
+            // Ignore storage errors
+        }
+    }
+
+    return response;
 }
