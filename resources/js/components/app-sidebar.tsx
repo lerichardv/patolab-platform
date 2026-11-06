@@ -18,6 +18,7 @@ import {
     Settings,
     Tv,
     FileSpreadsheet,
+    FileSearch,
     BarChart3,
     Calculator,
     CalendarDays,
@@ -46,6 +47,7 @@ import { index as billingSummaryReportIndex } from '@/actions/App/Http/Controlle
 import { index as creditGroupReportIndex } from '@/actions/App/Http/Controllers/Reports/CreditGroupReportController';
 import { index as cuttingsReportIndex } from '@/actions/App/Http/Controllers/Reports/CuttingsReportController';
 import { index as deliveryReportIndex } from '@/actions/App/Http/Controllers/Reports/DeliveryReportController';
+import { index as keywordSearchReportIndex } from '@/actions/App/Http/Controllers/Reports/KeywordSearchReportController';
 import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
 import { index as sequencesIndex } from '@/actions/App/Http/Controllers/SequenceController';
 import { index as settingsSystemIndex } from '@/actions/App/Http/Controllers/SettingController';
@@ -367,6 +369,12 @@ const adminNavItems: NavItem[] = [
                 href: cuttingsReportIndex(),
                 icon: FileSpreadsheet,
                 permission: 'reports.cuttings.view',
+            },
+            {
+                title: 'Reporte de Palabras Clave',
+                href: keywordSearchReportIndex(),
+                icon: FileSearch,
+                permission: 'reports.keywords.view',
             },
         ],
     },

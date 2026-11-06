@@ -1711,7 +1711,9 @@ class SpecimenController extends Controller
         $value = $validated['value'] ?? null;
         $cancellationReason = $validated['cancellation_reason'] ?? null;
 
-        if (in_array($action, ['change_status', 'change_priority'])) {
+        if ($action === 'change_status') {
+            Gate::authorize('specimens.manage_status');
+        } elseif ($action === 'change_priority') {
             Gate::authorize('specimens.edit');
         } elseif (in_array($action, ['assign_pathologist', 'unassign_pathologist'])) {
             Gate::authorize('specimens.manage');

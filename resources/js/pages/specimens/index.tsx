@@ -232,6 +232,10 @@ export default function SpecimensIndex({
     const auth = props.auth || {};
     const flash = props.flash || {};
     const isMobile = useIsMobile();
+    const canManageStatus = Boolean(
+        auth.user?.role?.slug === 'admin' ||
+        auth.permissions?.includes('specimens.manage_status'),
+    );
 
     const [priorities, setPriorities] = useState<Priority[]>(() =>
         deduplicateSpecimens(initialPriorities || []),
@@ -1790,6 +1794,7 @@ export default function SpecimensIndex({
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                             {(auth.permissions?.includes('specimens.edit') ||
+                                canManageStatus ||
                                 auth.permissions?.includes(
                                     'specimens.manage',
                                 ) ||
@@ -1817,9 +1822,7 @@ export default function SpecimensIndex({
                                         <DropdownMenuSeparator />
 
                                         {/* Cambiar Estado Submenu */}
-                                        {auth.permissions?.includes(
-                                            'specimens.edit',
-                                        ) && (
+                                        {canManageStatus && (
                                             <DropdownMenuSub>
                                                 <DropdownMenuSubTrigger>
                                                     <Tag className="mr-2 h-4 w-4" />
@@ -1962,6 +1965,7 @@ export default function SpecimensIndex({
                                                 {(auth.permissions?.includes(
                                                     'specimens.edit',
                                                 ) ||
+                                                    canManageStatus ||
                                                     auth.permissions?.includes(
                                                         'specimens.manage',
                                                     )) && (

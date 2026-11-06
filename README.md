@@ -5,9 +5,12 @@ PatoLab es una aplicación web diseñada para la gestión de laboratorios, segui
 ---
 
 ## Stack Tecnológico
-- **Backend**: Laravel 11 (PHP 8.2+)
-- **Frontend**: React (Inertia.js) + TypeScript + Tailwind CSS (Vite / Rolldown)
-- **Base de datos**: MySQL / PostgreSQL
+- **Backend**: Laravel 13 (PHP 8.3+) + Fortify
+- **Frontend**: React 19 (Inertia.js v3) + TypeScript + Tailwind CSS 4 (Vite)
+- **Base de datos**: SQLite (desarrollo/pruebas) / MySQL / PostgreSQL (producción)
+- **WebSockets en Tiempo Real**:
+  - **Laravel Reverb**: Eventos y notificaciones en vivo (ej. Control de Órdenes de Trabajo).
+  - **Hocuspocus v4**: Servidor de edición colaborativa en tiempo real (TipTap + Yjs) en `editor-collaboration-server/` (puerto `1234`).
 - **Generación de PDF**: Spatie Browsershot / Chromium
 
 ---
@@ -73,9 +76,40 @@ Asegúrate de tener instalado lo siguiente en tu sistema:
    ```
 
 9. **Ejecutar el Servidor de Desarrollo**:
+
+   **Opción A (Recomendada — Todo en uno con `composer dev`)**:
+   Inicia concurrentemente el servidor web (`artisan serve`), el procesador de colas (`queue:listen`), el visualizador de logs (`pail`), Vite (`npm run dev`) y el servidor WebSocket de Laravel Reverb (`reverb:start --debug`):
    ```bash
-   php artisan serve
+   composer dev
    ```
+
+   **Opción B (Servidores individuales en terminales separadas)**:
+   - **Servidor web de Laravel**:
+     ```bash
+     php artisan serve
+     ```
+   - **Compilador Vite**:
+     ```bash
+     npm run dev
+     ```
+   - **Procesador de colas**:
+     ```bash
+     php artisan queue:listen
+     ```
+   - **Servidor WebSocket de Laravel Reverb** (puerto `8080`, para eventos y notificaciones en tiempo real):
+     ```bash
+     php artisan reverb:start --debug
+     ```
+
+10. **Servidor WebSocket de Colaboración (Hocuspocus / Editor de Informes)**:
+    El editor de informes diagnósticos colaborativo (TipTap + Yjs) requiere su propio servidor WebSocket en Node.js ubicado en `editor-collaboration-server/` (puerto `1234`):
+    ```bash
+    cd editor-collaboration-server
+    cp .env.example .env
+    npm install
+    npm run dev
+    ```
+    *Para volver a la raíz del proyecto: `cd ..`*
 
 ---
 
@@ -200,12 +234,64 @@ Al desplegar el proyecto en un servidor de producción o entorno de contenedores
    max_input_vars = 10000
    ```
 
-10. **Configuración de Supervisor (para el Servidor de Colaboración)**:
-    Cada vez que el `editor-collaboration-server` (o los procesadores de colas) se actualicen, debes recargar/reiniciar Supervisor para aplicar los cambios. Abre tu terminal y ejecuta estos comandos:
+10. **Configuración de Supervisor (Servidores WebSocket y Procesadores en Segundo Plano)**:
+    En un entorno de producción, los servicios persistentes deben ejecutarse en segundo plano gestionados por Supervisor:
+
+    #### A. Laravel Reverb (Servidor WebSocket de Eventos y Notificaciones en Vivo)
+    Crea el archivo `/etc/supervisor/conf.d/patolab-reverb.conf`:
+    ```ini
+    [program:patolab-reverb]
+    process_name=%(program_name)s
+    command=php /var/www/patolab/artisan reverb:start
+    autostart=true
+    autorestart=true
+    user=www-data
+    redirect_stderr=true
+    stdout_logfile=/var/www/patolab/storage/logs/reverb.log
+    stopwaitsecs=3600
+    ```
+
+    #### B. Servidor de Colaboración Hocuspocus (WebSockets del Editor de Informes Diagnósticos)
+    Instala las dependencias en la carpeta del servidor de colaboración:
+    ```bash
+    cd /var/www/patolab/editor-collaboration-server
+    npm ci --omit=dev
+    ```
+    Crea el archivo `/etc/supervisor/conf.d/patolab-collaboration.conf`:
+    ```ini
+    [program:patolab-collaboration]
+    process_name=%(program_name)s
+    directory=/var/www/patolab/editor-collaboration-server
+    command=node index.js
+    autostart=true
+    autorestart=true
+    user=www-data
+    environment=NODE_ENV="production"
+    redirect_stderr=true
+    stdout_logfile=/var/www/patolab/storage/logs/collaboration.log
+    ```
+
+    #### C. Procesador de Colas de Laravel (Queue Worker)
+    Crea el archivo `/etc/supervisor/conf.d/patolab-worker.conf`:
+    ```ini
+    [program:patolab-worker]
+    process_name=%(program_name)s_%(process_num)02d
+    command=php /var/www/patolab/artisan queue:work --queue=default --sleep=3 --tries=3 --max-time=3600
+    autostart=true
+    autorestart=true
+    user=www-data
+    numprocs=2
+    redirect_stderr=true
+    stdout_logfile=/var/www/patolab/storage/logs/worker.log
+    stopwaitsecs=3600
+    ```
+
+    #### D. Aplicar cambios y reiniciar servicios en Supervisor
+    Cada vez que se actualice el código o la configuración, recarga y reinicia los procesos:
     ```bash
     sudo supervisorctl reread
     sudo supervisorctl update
-    sudo supervisorctl restart [nombre_del_proceso]
+    sudo supervisorctl restart all
     ```
 
 11. **Configuración de Firma Digital de Documentos**:

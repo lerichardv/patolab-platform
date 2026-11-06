@@ -633,3 +633,81 @@ test('user with manage_status permission can update status on quickUpdate', func
     // Status was successfully updated!
     expect($specimen->status)->toBe('processing');
 });
+
+test('bulkAction change_status throws 403 when user lacks specimens.manage_status permission', function () {
+    $role = Role::create(['name' => 'Editor Sem Permissao Status', 'slug' => 'editor_no_manage_status']);
+    $permEdit = Permission::firstOrCreate(['slug' => 'specimens.edit'], ['name' => 'Editar Muestras']);
+    $role->permissions()->attach($permEdit->id);
+
+    $user = User::factory()->create(['role_id' => $role->id]);
+
+    $type = SpecimenType::create(['name' => 'Biopsia Bulk Forbidden', 'active' => true]);
+    $type->states()->create(['status' => 'received', 'step_order' => 1, 'active' => true]);
+    $type->states()->create(['status' => 'processing', 'step_order' => 2, 'active' => true]);
+
+    $priority = Priority::create(['name' => 'Prio Forbidden', 'order' => 1, 'color' => '#000000']);
+    $customer = Customer::factory()->create();
+    $category = SpecimenCategory::create(['name' => 'Cat Bulk Forbidden', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Médico Bulk Forbidden', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Dr. Bulk Forbidden', 'referrer_type' => $referrerType->id, 'active' => true]);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'TEST-BULK-FORB-2026',
+        'status' => 'received',
+        'specimen_type' => $type->id,
+        'customer' => $customer->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+    ]);
+
+    $response = $this->actingAs($user)->post(route('specimens.bulk-action'), [
+        'ids' => [$specimen->id],
+        'action' => 'change_status',
+        'value' => 'processing',
+    ]);
+
+    $response->assertForbidden();
+
+    $specimen->refresh();
+    expect($specimen->status)->toBe('received');
+});
+
+test('bulkAction change_status succeeds when user has specimens.manage_status permission', function () {
+    $role = Role::create(['name' => 'Editor Com Permissao Status', 'slug' => 'editor_with_manage_status']);
+    $permManageStatus = Permission::firstOrCreate(['slug' => 'specimens.manage_status'], ['name' => 'Gestionar Estado']);
+    $role->permissions()->attach($permManageStatus->id);
+
+    $user = User::factory()->create(['role_id' => $role->id]);
+
+    $type = SpecimenType::create(['name' => 'Biopsia Bulk Allowed', 'active' => true]);
+    $type->states()->create(['status' => 'received', 'step_order' => 1, 'active' => true]);
+    $type->states()->create(['status' => 'processing', 'step_order' => 2, 'active' => true]);
+
+    $priority = Priority::create(['name' => 'Prio Allowed', 'order' => 1, 'color' => '#000000']);
+    $customer = Customer::factory()->create();
+    $category = SpecimenCategory::create(['name' => 'Cat Bulk Allowed', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Médico Bulk Allowed', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Dr. Bulk Allowed', 'referrer_type' => $referrerType->id, 'active' => true]);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'TEST-BULK-ALLOW-2026',
+        'status' => 'received',
+        'specimen_type' => $type->id,
+        'customer' => $customer->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+    ]);
+
+    $response = $this->actingAs($user)->post(route('specimens.bulk-action'), [
+        'ids' => [$specimen->id],
+        'action' => 'change_status',
+        'value' => 'processing',
+    ]);
+
+    $response->assertRedirect();
+
+    $specimen->refresh();
+    expect($specimen->status)->toBe('processing');
+});

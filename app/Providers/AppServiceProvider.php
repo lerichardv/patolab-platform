@@ -5,7 +5,6 @@ namespace App\Providers;
 use App\Models\Product;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
-use App\Models\WorkOrder;
 use App\Services\SpecimenStatusService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\Relation;

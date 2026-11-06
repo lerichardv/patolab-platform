@@ -262,6 +262,15 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Reporte: Palabras Clave',
+        description:
+            'Permite consultar informes patológicos mediante búsqueda de palabras clave y texto técnico.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            view: 'reports.keywords.view',
+        },
+    },
+    {
         label: 'Otros Cobros',
         description: 'Gestión de cobros de equipos, espacios o servicios.',
         module: 'Otros Cobros',
