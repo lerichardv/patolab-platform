@@ -21,6 +21,7 @@ class BillingReconciliationService
         'transfer' => 4,
         'bank transfer' => 4,
         'credit' => 5,
+        'mixed' => 6,
     ];
 
     const PAYMENT_LABELS = [
@@ -29,6 +30,7 @@ class BillingReconciliationService
         3 => 'T/C POS',
         4 => 'Transferencia',
         5 => 'Crédito',
+        6 => 'Mixto',
     ];
 
     /**
@@ -187,22 +189,43 @@ class BillingReconciliationService
                 $dayTotals['discount'] += $row['discount'];
                 $dayTotals['net'] += $row['net_amount'];
 
-                switch ($row['payment_type_code']) {
-                    case 1:
-                        $settlement['cash'] += $row['net_amount'];
-                        break;
-                    case 2:
-                        $settlement['check'] += $row['net_amount'];
-                        break;
-                    case 3:
-                        $settlement['card'] += $row['net_amount'];
-                        break;
-                    case 4:
-                        $settlement['transfer'] += $row['net_amount'];
-                        break;
-                    case 5:
-                        $settlement['credit'] += $row['net_amount'];
-                        break;
+                if ($row['payment_type_code'] === 6 && $inv->payments && $inv->payments->isNotEmpty()) {
+                    foreach ($inv->payments as $payment) {
+                        switch ($payment->payment_method) {
+                            case 'cash':
+                                $settlement['cash'] += (float) $payment->amount;
+                                break;
+                            case 'check':
+                                $settlement['check'] += (float) $payment->amount;
+                                break;
+                            case 'card':
+                            case 'credit card':
+                                $settlement['card'] += (float) $payment->amount;
+                                break;
+                            case 'transfer':
+                            case 'bank transfer':
+                                $settlement['transfer'] += (float) $payment->amount;
+                                break;
+                        }
+                    }
+                } else {
+                    switch ($row['payment_type_code']) {
+                        case 1:
+                            $settlement['cash'] += $row['net_amount'];
+                            break;
+                        case 2:
+                            $settlement['check'] += $row['net_amount'];
+                            break;
+                        case 3:
+                            $settlement['card'] += $row['net_amount'];
+                            break;
+                        case 4:
+                            $settlement['transfer'] += $row['net_amount'];
+                            break;
+                        case 5:
+                            $settlement['credit'] += $row['net_amount'];
+                            break;
+                    }
                 }
 
                 $dayTaxable15 += $row['taxable_15'];
@@ -260,7 +283,7 @@ class BillingReconciliationService
         string $sortField = 'invoice_number',
         string $sortDirection = 'asc'
     ) {
-        $query = Invoice::with(['customer', 'specimen.type', 'createdBy', 'creditRelation'])
+        $query = Invoice::with(['customer', 'specimen.type', 'createdBy', 'creditRelation', 'payments'])
             ->where(function ($q) use ($startDate, $endDate) {
                 $q->whereBetween(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), [
                     $startDate->toDateTimeString(),

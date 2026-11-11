@@ -570,7 +570,8 @@ export const BalanceBoard: React.FC<BalanceBoardProps> = ({
                         const updatedRow = { ...row, days: { ...row.days } };
 
                         // 1. Remove from source date
-                        const sourceDayData = updatedRow.days[sourceParsed.date];
+                        const sourceDayData =
+                            updatedRow.days[sourceParsed.date];
                         const sourceList = [
                             ...(sourceDayData?.specimens || []),
                         ];

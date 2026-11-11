@@ -14,6 +14,7 @@ use App\Models\SpecimenGroup;
 use App\Models\SpecimenGroupCustomer;
 use App\Models\SpecimenType;
 use App\Services\DateFilterService;
+use App\Services\InvoicePaymentService;
 use App\Services\InvoicePdfService;
 use Carbon\Carbon;
 use Carbon\CarbonInterval;
@@ -402,7 +403,18 @@ class CreditController extends Controller
                     }
                 },
             ],
-            'payment_type' => $isSocialSecurity ? 'required|in:n/a' : 'required|in:cash,credit card,bank transfer,check',
+            'payment_type' => $isSocialSecurity ? 'required|in:n/a' : 'required|in:cash,credit card,bank transfer,check,mixed',
+            'payments' => 'nullable|array',
+            'payments.*.payment_method' => 'required_with:payments|in:cash,credit card,bank transfer,check',
+            'payments.*.amount' => 'required_with:payments|numeric|min:0.01',
+            'payments.*.payment_date' => 'nullable|date',
+            'payments.*.check_number' => 'nullable|string|max:100',
+            'payments.*.card_last_4' => 'nullable|string|max:10',
+            'payments.*.card_expiration' => 'nullable|string|max:10',
+            'payments.*.card_authorization_code' => 'nullable|string|max:100',
+            'payments.*.transfer_bank_id' => 'nullable|exists:banks,id',
+            'payments.*.transfer_authorization_code' => 'nullable|string|max:100',
+            'payments.*.proof_of_payment' => 'nullable',
             'is_social_security' => 'nullable|boolean',
             'payment_method_date' => 'nullable|date',
             'cash_value' => 'nullable|numeric|min:0',
@@ -416,7 +428,7 @@ class CreditController extends Controller
             'transfer_value' => 'nullable|numeric|min:0',
             'transfer_authorization_code' => 'nullable|string|max:100',
             'proof_of_payment' => [
-                ($isSocialSecurity || $request->input('payment_type') === 'cash') ? 'nullable' : 'required',
+                ($isSocialSecurity || $request->input('payment_type') === 'cash' || $request->input('payment_type') === 'mixed') ? 'nullable' : 'required',
                 'file',
                 function ($attribute, $value, $fail) {
                     if ($value instanceof UploadedFile) {
@@ -441,6 +453,10 @@ class CreditController extends Controller
             'specimens.*.id' => 'required|exists:specimen,id',
             'specimens.*.quantity' => 'required|integer|min:1',
         ]);
+
+        if ($validated['payment_type'] === 'mixed') {
+            InvoicePaymentService::validateTotal($request->input('payments', []), (float) $validated['amount_paid']);
+        }
 
         if ($credit->is_group) {
             $specimens = $validated['specimens'] ?? [];
@@ -507,6 +523,10 @@ class CreditController extends Controller
 
             // Update specimen payment quantities only if NOT social security invoice
             if (! $isSocialSecurity) {
+                if ($validated['payment_type'] === 'mixed') {
+                    InvoicePaymentService::validateTotal($request->input('payments', []), (float) $validated['amount_paid']);
+                }
+
                 if ($credit->is_group) {
                     foreach ($validated['specimens'] as $item) {
                         $dbRow = DB::table('invoice_specimens')
@@ -569,6 +589,10 @@ class CreditController extends Controller
                 'group_id' => $credit->is_group ? $credit->group_id : null,
             ]);
 
+            if ($invoice->payment_type === 'mixed') {
+                InvoicePaymentService::savePayments($invoice, $request->input('payments', []), $request);
+            }
+
             // Update credit values only if NOT social security
             if (! $isSocialSecurity) {
                 $newRemaining = $credit->amount_remaining - $amountPaid;
@@ -598,6 +622,10 @@ class CreditController extends Controller
             // Fetch the specimens being paid in this transaction for the PDF
             $paidSpecimens = [];
             $paidSpecimensData = [];
+            if ($validated['payment_type'] === 'mixed') {
+                InvoicePaymentService::validateTotal($request->input('payments', []), (float) $validated['amount_paid']);
+            }
+
             if ($credit->is_group) {
                 $specimenIds = array_column($validated['specimens'], 'id');
                 $paidSpecimens = Specimen::whereIn('id', $specimenIds)
@@ -1181,7 +1209,18 @@ class CreditController extends Controller
         }
 
         $validated = $request->validate([
-            'payment_type' => 'required|in:cash,credit card,bank transfer,check',
+            'payment_type' => 'required|in:cash,credit card,bank transfer,check,mixed',
+            'payments' => 'nullable|array',
+            'payments.*.payment_method' => 'required_with:payments|in:cash,credit card,bank transfer,check',
+            'payments.*.amount' => 'required_with:payments|numeric|min:0.01',
+            'payments.*.payment_date' => 'nullable|date',
+            'payments.*.check_number' => 'nullable|string|max:100',
+            'payments.*.card_last_4' => 'nullable|string|max:10',
+            'payments.*.card_expiration' => 'nullable|string|max:10',
+            'payments.*.card_authorization_code' => 'nullable|string|max:100',
+            'payments.*.transfer_bank_id' => 'nullable|exists:banks,id',
+            'payments.*.transfer_authorization_code' => 'nullable|string|max:100',
+            'payments.*.proof_of_payment' => 'nullable',
             'payment_method_date' => 'nullable|date',
             'cash_value' => 'nullable|numeric|min:0',
             'check_number' => 'nullable|string|max:100',
@@ -1194,7 +1233,7 @@ class CreditController extends Controller
             'transfer_value' => 'nullable|numeric|min:0',
             'transfer_authorization_code' => 'nullable|string|max:100',
             'proof_of_payment' => [
-                $request->input('payment_type') === 'cash' ? 'nullable' : 'required',
+                ($request->input('payment_type') === 'cash' || $request->input('payment_type') === 'mixed') ? 'nullable' : 'required',
                 'file',
                 function ($attribute, $value, $fail) {
                     if ($value instanceof UploadedFile) {
@@ -1247,6 +1286,12 @@ class CreditController extends Controller
                     'transfer_value' => $request->input('payment_type') === 'bank transfer' ? ($request->input('transfer_value') ? (float) $request->input('transfer_value') : $amountPaid) : null,
                     'transfer_authorization_code' => $request->input('payment_type') === 'bank transfer' ? $request->input('transfer_authorization_code') : null,
                 ]);
+
+                if ($originalInvoice->payment_type === 'mixed') {
+                    InvoicePaymentService::syncPayments($originalInvoice, $request->input('payments', []), $request);
+                } else {
+                    $originalInvoice->payments()->delete();
+                }
 
                 try {
                     $originalInvoice->refresh();

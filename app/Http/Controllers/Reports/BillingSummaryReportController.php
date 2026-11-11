@@ -99,19 +99,43 @@ class BillingSummaryReportController extends Controller
 
         foreach ($activeRowsAll as $row) {
             $paymentType = $row['payment_type'];
-            $normalizedType = 'cash';
-            if (in_array($paymentType, ['card', 'credit card'])) {
-                $normalizedType = 'card';
-            } elseif (in_array($paymentType, ['transfer', 'bank transfer'])) {
-                $normalizedType = 'transfer';
-            } elseif ($paymentType === 'check') {
-                $normalizedType = 'check';
-            } elseif ($paymentType === 'credit') {
-                $normalizedType = 'credit';
-            }
+            if ($paymentType === 'mixed' && ! empty($row['invoice']) && $row['invoice']->payments && $row['invoice']->payments->isNotEmpty()) {
+                $invTotal = (float) ($row['invoice']->total > 0 ? $row['invoice']->total : $row['invoice']->total_paid);
+                $ratio = $invTotal > 0 ? ($row['net_amount'] / $invTotal) : 1.0;
+                foreach ($row['invoice']->payments as $p) {
+                    $allocated = round((float) $p->amount * $ratio, 2);
+                    switch ($p->payment_method) {
+                        case 'cash':
+                            $paymentDetails['cash'] += $allocated;
+                            break;
+                        case 'card':
+                        case 'credit card':
+                            $paymentDetails['card'] += $allocated;
+                            break;
+                        case 'transfer':
+                        case 'bank transfer':
+                            $paymentDetails['transfer'] += $allocated;
+                            break;
+                        case 'check':
+                            $paymentDetails['check'] += $allocated;
+                            break;
+                    }
+                }
+            } else {
+                $normalizedType = 'cash';
+                if (in_array($paymentType, ['card', 'credit card'])) {
+                    $normalizedType = 'card';
+                } elseif (in_array($paymentType, ['transfer', 'bank transfer'])) {
+                    $normalizedType = 'transfer';
+                } elseif ($paymentType === 'check') {
+                    $normalizedType = 'check';
+                } elseif ($paymentType === 'credit') {
+                    $normalizedType = 'credit';
+                }
 
-            if (isset($paymentDetails[$normalizedType])) {
-                $paymentDetails[$normalizedType] += $row['net_amount'];
+                if (isset($paymentDetails[$normalizedType])) {
+                    $paymentDetails[$normalizedType] += $row['net_amount'];
+                }
             }
             $paymentDetails['total'] += $row['net_amount'];
 
@@ -477,7 +501,29 @@ class BillingSummaryReportController extends Controller
         $creditTotal = 0.0;
         foreach ($activeRows as $r) {
             $paymentType = $r['payment_type'];
-            if ($paymentType === 'cash') {
+            if ($paymentType === 'mixed' && ! empty($r['invoice']) && $r['invoice']->payments && $r['invoice']->payments->isNotEmpty()) {
+                $invTotal = (float) ($r['invoice']->total > 0 ? $r['invoice']->total : $r['invoice']->total_paid);
+                $ratio = $invTotal > 0 ? ($r['net_amount'] / $invTotal) : 1.0;
+                foreach ($r['invoice']->payments as $p) {
+                    $allocated = round((float) $p->amount * $ratio, 2);
+                    switch ($p->payment_method) {
+                        case 'cash':
+                            $cashTotal += $allocated;
+                            break;
+                        case 'card':
+                        case 'credit card':
+                            $cardTotal += $allocated;
+                            break;
+                        case 'check':
+                            $checkTotal += $allocated;
+                            break;
+                        case 'transfer':
+                        case 'bank transfer':
+                            $transferTotal += $allocated;
+                            break;
+                    }
+                }
+            } elseif ($paymentType === 'cash') {
                 $cashTotal += $r['net_amount'];
             } elseif (in_array($paymentType, ['card', 'credit card'])) {
                 $cardTotal += $r['net_amount'];
@@ -648,6 +694,7 @@ class BillingSummaryReportController extends Controller
             'creditInvoiceSpecimens.specimen.specimenExaminations.examination',
             'creditInvoiceSpecimens.specimen.invoiceSpecimens.examination',
             'createdBy',
+            'payments',
         ]);
 
         if ($isCancelled) {
@@ -1309,6 +1356,7 @@ class BillingSummaryReportController extends Controller
             'bank transfer' => 'Transferencia',
             'check' => 'Cheque',
             'credit' => 'Al Crédito',
+            'mixed' => 'Mixto',
         ];
 
         return $labels[$type] ?? $type;

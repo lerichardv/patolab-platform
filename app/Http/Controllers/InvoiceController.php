@@ -20,6 +20,7 @@ use App\Models\WorkOrderTask;
 use App\Models\WorkOrderType;
 use App\Services\DateFilterService;
 use App\Services\InvoiceCalculationService;
+use App\Services\InvoicePaymentService;
 use App\Services\InvoicePdfService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -143,6 +144,7 @@ class InvoiceController extends Controller
             'creditRelation.creditInvoiceSpecimens.specimen.customerRelation:id,name',
             'creditRelation.creditInvoiceSpecimens.specimen.type:id,name',
             'creditRelation.creditInvoiceSpecimens.specimen.examination:id,name',
+            'payments.transferBank:id,name',
         ]);
 
         // Filter by regular search query (Invoice number, Customer RTN/ID, or Specimen sequence code - omits customer name)
@@ -638,7 +640,18 @@ class InvoiceController extends Controller
             'customer_id' => 'required|exists:customers,id',
             'has_individual_customer' => 'nullable|boolean',
             'individual_customer_id' => 'nullable|exists:customers,id',
-            'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit',
+            'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit,mixed',
+            'payments' => 'nullable|array',
+            'payments.*.payment_method' => 'required_with:payments|in:cash,credit card,bank transfer,check',
+            'payments.*.amount' => 'required_with:payments|numeric|min:0.01',
+            'payments.*.payment_date' => 'nullable|date',
+            'payments.*.check_number' => 'nullable|string|max:100',
+            'payments.*.card_last_4' => 'nullable|string|max:10',
+            'payments.*.card_expiration' => 'nullable|string|max:10',
+            'payments.*.card_authorization_code' => 'nullable|string|max:100',
+            'payments.*.transfer_bank_id' => 'nullable|exists:banks,id',
+            'payments.*.transfer_authorization_code' => 'nullable|string|max:100',
+            'payments.*.proof_of_payment' => 'nullable',
             'quantity' => 'required|integer|min:1',
             'amount' => 'required|numeric|min:0',
             'discount' => 'required|numeric|min:0',
@@ -740,6 +753,13 @@ class InvoiceController extends Controller
         // Extract group_specimens to process separately
         $groupSpecimensData = $validated['group_specimens'] ?? null;
         unset($validated['group_specimens']);
+
+        $paymentsData = $validated['payments'] ?? [];
+        unset($validated['payments']);
+
+        if ($validated['payment_type'] === 'mixed') {
+            InvoicePaymentService::validateTotal($paymentsData, (float) $validated['total']);
+        }
 
         // Calculate tax/exempt fields based on invoice type
         if ($invoice->invoice_type === 'rental' || $invoice->rental_id) {
@@ -948,6 +968,12 @@ class InvoiceController extends Controller
                         ]);
                     }
                 }
+            }
+
+            if ($validated['payment_type'] === 'mixed') {
+                InvoicePaymentService::syncPayments($invoice, $paymentsData, $request);
+            } else {
+                $invoice->payments()->delete();
             }
         });
 

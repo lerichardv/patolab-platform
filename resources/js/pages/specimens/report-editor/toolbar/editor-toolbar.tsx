@@ -442,12 +442,10 @@ export function EditorToolbar({
                     }
 
                     if (foundPos) {
-                        replaceFrom = (
-                            foundPos as { from: number; to: number }
-                        ).from;
-                        replaceTo = (
-                            foundPos as { from: number; to: number }
-                        ).to;
+                        replaceFrom = (foundPos as { from: number; to: number })
+                            .from;
+                        replaceTo = (foundPos as { from: number; to: number })
+                            .to;
                     }
                 }
             }

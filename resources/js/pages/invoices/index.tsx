@@ -146,7 +146,24 @@ interface Invoice {
         | 'transfer'
         | 'bank transfer'
         | 'credit'
-        | 'check';
+        | 'check'
+        | 'n/a'
+        | 'mixed';
+    payments?: Array<{
+        id: number;
+        invoice_id: number;
+        payment_method: string;
+        amount: number | string;
+        payment_date?: string | null;
+        check_number?: string | null;
+        card_last_4?: string | null;
+        card_expiration?: string | null;
+        card_authorization_code?: string | null;
+        transfer_bank_id?: number | string | null;
+        transfer_bank?: { id: number; name: string } | null;
+        transfer_authorization_code?: string | null;
+        proof_of_payment?: string | null;
+    }>;
     credit_payment_id: number | null;
     credit_relation: any;
     amount: string | number;
@@ -1233,6 +1250,7 @@ export default function InvoicesIndex({
             'bank transfer': 'Transferencia Bancaria',
             check: 'Cheque',
             credit: 'Crédito',
+            mixed: 'Pago Mixto',
         };
 
         return labels[type] || type;
@@ -1240,6 +1258,15 @@ export default function InvoicesIndex({
 
     const getPaymentBadge = (type: string) => {
         switch (type) {
+            case 'mixed':
+                return (
+                    <Badge
+                        variant="outline"
+                        className="rounded-full border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-400"
+                    >
+                        Pago Mixto
+                    </Badge>
+                );
             case 'cash':
                 return (
                     <Badge
@@ -1365,8 +1392,8 @@ export default function InvoicesIndex({
 
     const getCreditStatusBadge = (credit: any) => {
         if (!credit) {
-return null;
-}
+            return null;
+        }
 
         const status = credit.status;
 
@@ -1733,6 +1760,9 @@ return null;
                                         Crédito
                                     </SelectItem>
                                     <SelectItem value="n/a">N/A</SelectItem>
+                                    <SelectItem value="mixed">
+                                        Pago Mixto
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -2171,8 +2201,153 @@ return null;
                                                         </TableCell>
                                                         <TableCell className="min-w-[150px]">
                                                             <div className="flex items-center gap-1.5">
-                                                                {getPaymentBadge(
-                                                                    invoice.payment_type,
+                                                                {invoice.payment_type ===
+                                                                    'mixed' &&
+                                                                invoice.payments &&
+                                                                invoice.payments
+                                                                    .length >
+                                                                    0 ? (
+                                                                    <Popover>
+                                                                        <PopoverTrigger
+                                                                            asChild
+                                                                        >
+                                                                            <button
+                                                                                type="button"
+                                                                                className="inline-flex cursor-pointer items-center transition-opacity hover:opacity-80 focus:outline-none"
+                                                                                title="Click para ver desglose de pagos mixtos"
+                                                                            >
+                                                                                {getPaymentBadge(
+                                                                                    invoice.payment_type,
+                                                                                )}
+                                                                            </button>
+                                                                        </PopoverTrigger>
+                                                                        <PopoverContent
+                                                                            align="start"
+                                                                            className="w-72 p-3 text-xs shadow-md"
+                                                                            onClick={(
+                                                                                e,
+                                                                            ) =>
+                                                                                e.stopPropagation()
+                                                                            }
+                                                                        >
+                                                                            <div className="space-y-2">
+                                                                                <div className="flex items-center justify-between border-b border-border pb-1.5 font-semibold text-foreground">
+                                                                                    <span>
+                                                                                        Desglose
+                                                                                        de
+                                                                                        Pago
+                                                                                        Mixto
+                                                                                    </span>
+                                                                                    <span className="font-mono text-xs text-muted-foreground">
+                                                                                        {
+                                                                                            invoice
+                                                                                                .payments
+                                                                                                .length
+                                                                                        }{' '}
+                                                                                        pagos
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="space-y-1.5">
+                                                                                    {invoice.payments.map(
+                                                                                        (
+                                                                                            p,
+                                                                                            idx,
+                                                                                        ) => (
+                                                                                            <div
+                                                                                                key={
+                                                                                                    p.id ||
+                                                                                                    idx
+                                                                                                }
+                                                                                                className="flex items-center justify-between rounded bg-muted/40 px-2 py-1"
+                                                                                            >
+                                                                                                <div className="flex flex-col">
+                                                                                                    <span className="font-medium text-foreground">
+                                                                                                        {getPaymentTypeLabel(
+                                                                                                            p.payment_method,
+                                                                                                        )}
+                                                                                                    </span>
+                                                                                                    {p
+                                                                                                        .transfer_bank
+                                                                                                        ?.name && (
+                                                                                                        <span className="text-[10px] text-muted-foreground">
+                                                                                                            {
+                                                                                                                p
+                                                                                                                    .transfer_bank
+                                                                                                                    .name
+                                                                                                            }
+                                                                                                            {p.transfer_authorization_code
+                                                                                                                ? ` - Ref: ${p.transfer_authorization_code}`
+                                                                                                                : ''}
+                                                                                                        </span>
+                                                                                                    )}
+                                                                                                    {p.check_number && (
+                                                                                                        <span className="text-[10px] text-muted-foreground">
+                                                                                                            Cheque
+                                                                                                            #
+                                                                                                            {
+                                                                                                                p.check_number
+                                                                                                            }
+                                                                                                        </span>
+                                                                                                    )}
+                                                                                                    {p.card_last_4 && (
+                                                                                                        <span className="text-[10px] text-muted-foreground">
+                                                                                                            Tarjeta
+                                                                                                            ****{' '}
+                                                                                                            {
+                                                                                                                p.card_last_4
+                                                                                                            }
+                                                                                                        </span>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                                <span className="font-mono font-semibold text-foreground">
+                                                                                                    L.{' '}
+                                                                                                    {parseFloat(
+                                                                                                        String(
+                                                                                                            p.amount ||
+                                                                                                                0,
+                                                                                                        ),
+                                                                                                    ).toFixed(
+                                                                                                        2,
+                                                                                                    )}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        ),
+                                                                                    )}
+                                                                                </div>
+                                                                                <div className="flex items-center justify-between border-t border-border pt-1.5 font-medium">
+                                                                                    <span className="text-muted-foreground">
+                                                                                        Total
+                                                                                        Pagado:
+                                                                                    </span>
+                                                                                    <span className="font-mono font-bold text-foreground">
+                                                                                        L.{' '}
+                                                                                        {invoice.payments
+                                                                                            .reduce(
+                                                                                                (
+                                                                                                    acc,
+                                                                                                    curr,
+                                                                                                ) =>
+                                                                                                    acc +
+                                                                                                    parseFloat(
+                                                                                                        String(
+                                                                                                            curr.amount ||
+                                                                                                                0,
+                                                                                                        ),
+                                                                                                    ),
+                                                                                                0,
+                                                                                            )
+                                                                                            .toFixed(
+                                                                                                2,
+                                                                                            )}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </PopoverContent>
+                                                                    </Popover>
+                                                                ) : (
+                                                                    getPaymentBadge(
+                                                                        invoice.payment_type,
+                                                                    )
                                                                 )}
                                                                 {/* {invoice.payment_type ===
 													'credit' &&

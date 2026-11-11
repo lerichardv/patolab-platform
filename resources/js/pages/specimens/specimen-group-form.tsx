@@ -365,6 +365,7 @@ export default function SpecimenGroupForm({
     const [transferValue, setTransferValue] = useState('');
     const [transferAuthorizationCode, setTransferAuthorizationCode] =
         useState('');
+    const [payments, setPayments] = useState<any[]>([]);
 
     const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false);
     const [processing, setProcessing] = useState(false);
@@ -383,6 +384,7 @@ export default function SpecimenGroupForm({
         setTransferBankId('');
         setTransferValue('');
         setTransferAuthorizationCode('');
+        setPayments([]);
     };
 
     // Reset whole form when opened
@@ -693,6 +695,24 @@ export default function SpecimenGroupForm({
                 setTransferValue(invoice.transfer_value?.toString() || '');
                 setTransferAuthorizationCode(
                     invoice.transfer_authorization_code || '',
+                );
+                setPayments(
+                    (invoice.payments || []).map((p: any) => ({
+                        id: p.id,
+                        payment_method: p.payment_method,
+                        amount: p.amount ? p.amount.toString() : '',
+                        payment_date: p.payment_date || '',
+                        check_number: p.check_number || '',
+                        card_last_4: p.card_last_4 || '',
+                        card_expiration: p.card_expiration || '',
+                        card_authorization_code:
+                            p.card_authorization_code || '',
+                        transfer_bank_id: p.transfer_bank_id
+                            ? p.transfer_bank_id.toString()
+                            : '',
+                        transfer_authorization_code:
+                            p.transfer_authorization_code || '',
+                    })),
                 );
 
                 setIsFormDirty(false);
@@ -1832,7 +1852,9 @@ export default function SpecimenGroupForm({
         }
 
         const isProofRequired =
-            (paymentType !== 'credit' && paymentType !== 'cash') ||
+            (paymentType !== 'credit' &&
+                paymentType !== 'cash' &&
+                paymentType !== 'mixed') ||
             (paymentType === 'credit' &&
                 hasInitialPayment &&
                 initialPaymentType !== 'cash');
@@ -1968,6 +1990,7 @@ export default function SpecimenGroupForm({
             transfer_bank_id: transferBankId,
             transfer_value: transferValue,
             transfer_authorization_code: transferAuthorizationCode,
+            payments: paymentType === 'mixed' ? payments : undefined,
 
             // Specimens list
             specimens: specimensData,
@@ -2023,6 +2046,14 @@ export default function SpecimenGroupForm({
             },
         });
     };
+
+    const isProofRequired =
+        (paymentType !== 'credit' &&
+            paymentType !== 'cash' &&
+            paymentType !== 'mixed') ||
+        (paymentType === 'credit' &&
+            hasInitialPayment &&
+            initialPaymentType !== 'cash');
 
     return (
         <>
@@ -3354,9 +3385,11 @@ export default function SpecimenGroupForm({
                                 <div className="grid gap-2">
                                     <Label htmlFor="proof_of_payment">
                                         Comprobante de Pago (PDF o Imagen){' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
+                                        {isProofRequired && (
+                                            <span className="text-destructive">
+                                                *
+                                            </span>
+                                        )}
                                     </Label>
 
                                     {proofOfPayment ? (
@@ -5018,9 +5051,11 @@ export default function SpecimenGroupForm({
                     has_initial_payment: hasInitialPayment,
                     initial_payment_amount: initialPaymentAmount,
                     initial_payment_type: initialPaymentType,
+                    payments: payments,
                 }}
                 onSave={(paymentData: PaymentData) => {
                     setPaymentType(paymentData.payment_type);
+                    setPayments(paymentData.payments || []);
                     setPaymentMethodDate(paymentData.payment_method_date);
                     setCashValue(paymentData.cash_value);
                     setCheckNumber(paymentData.check_number);

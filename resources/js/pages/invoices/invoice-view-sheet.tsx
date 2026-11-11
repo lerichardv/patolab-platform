@@ -131,6 +131,7 @@ export default function InvoiceViewSheet({
             'bank transfer': 'Transferencia Bancaria',
             check: 'Cheque',
             credit: 'Crédito',
+            mixed: 'Pago Mixto',
         };
 
         return labels[type] || type;
@@ -377,6 +378,84 @@ export default function InvoiceViewSheet({
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Mixed Payments Breakdown */}
+                            {invoice.payment_type === 'mixed' && (
+                                <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                                    <h3 className="flex items-center gap-2 text-lg font-semibold text-primary">
+                                        <Coins className="h-5 w-5" /> Desglose
+                                        de Pagos Mixtos
+                                    </h3>
+                                    <Separator />
+                                    {invoice.payments &&
+                                    invoice.payments.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {invoice.payments.map(
+                                                (p: any, idx: number) => (
+                                                    <div
+                                                        key={p.id || idx}
+                                                        className="flex items-center justify-between rounded-md border bg-muted/40 p-3 text-sm"
+                                                    >
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <span className="font-semibold text-foreground">
+                                                                {getPaymentTypeLabel(
+                                                                    p.payment_method,
+                                                                )}
+                                                            </span>
+                                                            {p.transfer_bank
+                                                                ?.name && (
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    Banco:{' '}
+                                                                    {
+                                                                        p
+                                                                            .transfer_bank
+                                                                            .name
+                                                                    }
+                                                                    {p.transfer_authorization_code
+                                                                        ? ` | Ref: ${p.transfer_authorization_code}`
+                                                                        : ''}
+                                                                </span>
+                                                            )}
+                                                            {p.check_number && (
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    Cheque #
+                                                                    {
+                                                                        p.check_number
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                            {p.card_last_4 && (
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    Tarjeta ****{' '}
+                                                                    {
+                                                                        p.card_last_4
+                                                                    }
+                                                                    {p.card_expiration
+                                                                        ? ` (Vence: ${p.card_expiration})`
+                                                                        : ''}
+                                                                    {p.card_authorization_code
+                                                                        ? ` | Aut: ${p.card_authorization_code}`
+                                                                        : ''}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <span className="font-mono text-base font-bold text-foreground">
+                                                            L.{' '}
+                                                            {parseFloat(
+                                                                p.amount || 0,
+                                                            ).toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground italic">
+                                            No se han registrado líneas de pago.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Documents Block */}
                             <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">

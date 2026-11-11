@@ -367,7 +367,7 @@
                 @endif
                 <div class="factura-row">
                     <span>Factura:</span>
-                    <span style="text-transform: capitalize;">{{ ($invoice->invoice_type === 'social security' || $invoice->payment_type !== 'credit' || (float) $invoice->total_paid >= (float) $invoice->total || ($invoice->creditRelation && (float) $invoice->creditRelation->amount_remaining <= 0)) ? ($invoice->payment_type === 'check' ? 'Cheque' : 'Contado') : 'Crédito' }}</span>
+                    <span style="text-transform: capitalize;">{{ ($invoice->invoice_type === 'social security' || $invoice->payment_type !== 'credit' || (float) $invoice->total_paid >= (float) $invoice->total || ($invoice->creditRelation && (float) $invoice->creditRelation->amount_remaining <= 0)) ? ($invoice->payment_type === 'check' ? 'Cheque' : ($invoice->payment_type === 'mixed' ? 'Contado (Mixto)' : 'Contado')) : 'Crédito' }}</span>
                 </div>
                 @else
                 <div class="factura-row">
@@ -701,6 +701,23 @@
                 <span>Total:</span>
                 <span>L. {{ number_format($invoice->total, 2) }}</span>
             </div>
+            @if($invoice->payment_type === 'mixed' && $invoice->payments && $invoice->payments->isNotEmpty())
+            <div style="margin-top: 6px; padding-top: 4px; border-top: 1px dashed #cbd5e1; font-size: 8px; color: #334155; text-align: left;">
+                <div style="font-weight: bold; margin-bottom: 2px;">Detalle de Pagos:</div>
+                @foreach($invoice->payments as $p)
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1px;">
+                    <span>
+                        • {{ ucfirst($p->payment_method) }}
+                        @if($p->transferBank) ({{ $p->transferBank->name }}) @endif
+                        @if($p->transfer_authorization_code) [Ref: {{ $p->transfer_authorization_code }}] @endif
+                        @if($p->card_last_4) [**** {{ $p->card_last_4 }}] @endif
+                        @if($p->check_number) [Cheque #: {{ $p->check_number }}] @endif
+                    </span>
+                    <span style="font-family: monospace; font-weight: bold;">L. {{ number_format($p->amount, 2) }}</span>
+                </div>
+                @endforeach
+            </div>
+            @endif
         </div>
     </div>
 

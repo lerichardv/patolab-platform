@@ -1102,8 +1102,8 @@ export default function ReportWorkspace({
         // but now ALL main sections are completely empty, abort the save to prevent accidental wiping.
         const isFieldEmpty = (html: string | undefined | null) => {
             if (!html) {
-return true;
-}
+                return true;
+            }
 
             const stripped = html
                 .replace(/<[^>]*>/g, '')

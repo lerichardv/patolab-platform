@@ -285,6 +285,20 @@ export default function InvoiceForm({
                 : '',
         initial_payment_type: 'cash',
         proof_of_payment: null as File | null,
+        payments: (invoice?.payments || []).map((p: any) => ({
+            id: p.id,
+            payment_method: p.payment_method,
+            amount: p.amount ? p.amount.toString() : '',
+            payment_date: p.payment_date || '',
+            check_number: p.check_number || '',
+            card_last_4: p.card_last_4 || '',
+            card_expiration: p.card_expiration || '',
+            card_authorization_code: p.card_authorization_code || '',
+            transfer_bank_id: p.transfer_bank_id
+                ? p.transfer_bank_id.toString()
+                : '',
+            transfer_authorization_code: p.transfer_authorization_code || '',
+        })),
         group_specimens: [] as any[],
     });
 

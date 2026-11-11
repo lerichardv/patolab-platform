@@ -5,6 +5,7 @@ use App\Models\CaiRange;
 use App\Models\Credit;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\InvoicePayment;
 use App\Models\Location;
 use App\Models\Permission;
 use App\Models\Priority;
@@ -1292,4 +1293,82 @@ test('inertia request and excel export respect sort parameters', function () {
         ->and($sheetLiquidacion->getCell('D5')->getValue())->toBe('000-001-01-00007001');
 
     unlink($tempFile);
+});
+
+test('mixed payment invoice correctly splits amounts across settlement buckets and balances to 0.00', function () {
+    $date = '2026-08-10 10:00:00';
+
+    // Create an invoice with mixed payment: Total L. 1,500
+    // L. 500 in Cash, L. 1,000 in Transfer
+    $mixedInvoice = Invoice::create([
+        'full_invoice_number' => '000-001-01-00008001',
+        'invoice_number' => '00008001',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'mixed',
+        'created_by_id' => $this->user->id,
+        'quantity' => 1,
+        'amount' => 1500.00,
+        'discount' => 0.00,
+        'subtotal' => 1500.00,
+        'exempt_amount' => 1500.00,
+        'total' => 1500.00,
+        'total_paid' => 1500.00,
+        'invoice_file' => 'invoices/test_mixed_1.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'specimen',
+        'pay_isv' => false,
+    ]);
+
+    InvoicePayment::create([
+        'invoice_id' => $mixedInvoice->id,
+        'payment_method' => 'cash',
+        'amount' => 500.00,
+        'payment_date' => '2026-08-10',
+    ]);
+
+    InvoicePayment::create([
+        'invoice_id' => $mixedInvoice->id,
+        'payment_method' => 'bank transfer',
+        'amount' => 1000.00,
+        'payment_date' => '2026-08-10',
+        'transfer_authorization_code' => 'TX-MIXED-1000',
+    ]);
+
+    // Also a normal cash invoice of L. 300 on the same day
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00008002',
+        'invoice_number' => '00008002',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'created_by_id' => $this->user->id,
+        'quantity' => 1,
+        'amount' => 300.00,
+        'discount' => 0.00,
+        'subtotal' => 300.00,
+        'exempt_amount' => 300.00,
+        'total' => 300.00,
+        'total_paid' => 300.00,
+        'invoice_file' => 'invoices/test_cash_1.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'specimen',
+        'pay_isv' => false,
+    ]);
+
+    $controller = app(BillingReconciliationReportController::class);
+    $data = $controller->calculateReportData('2026-08-10', '2026-08-10');
+
+    $dayTable = $data['dailyTables'][0];
+
+    // Cash bucket: L. 500 (from mixed) + L. 300 (from cash invoice) = L. 800
+    // Transfer bucket: L. 1,000 (from mixed)
+    // Total net: L. 1,800
+    expect($dayTable['settlement']['cash'])->toEqual(800.0)
+        ->and($dayTable['settlement']['transfer'])->toEqual(1000.0)
+        ->and($dayTable['settlement']['total'])->toEqual(1800.0)
+        ->and($dayTable['totals']['net'])->toEqual(1800.0)
+        ->and($dayTable['settlement']['difference'])->toEqual(0.0)
+        ->and($dayTable['settlement']['is_balanced'])->toBeTrue()
+        ->and($dayTable['items'][0]['payment_type_label'])->toBe('Mixto');
 });

@@ -22,6 +22,7 @@ use App\Models\SpecimenReport;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Services\InvoiceCalculationService;
+use App\Services\InvoicePaymentService;
 use App\Services\InvoicePdfService;
 use App\Services\WhatsAppService;
 use Carbon\Carbon;
@@ -50,7 +51,18 @@ class SpecimenGroupController extends Controller
 
         $validated = $request->validate([
             'global_customer_id' => 'required|exists:customers,id',
-            'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit',
+            'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit,mixed',
+            'payments' => 'nullable|array',
+            'payments.*.payment_method' => 'required_with:payments|in:cash,credit card,bank transfer,check',
+            'payments.*.amount' => 'required_with:payments|numeric|min:0.01',
+            'payments.*.payment_date' => 'nullable|date',
+            'payments.*.check_number' => 'nullable|string|max:100',
+            'payments.*.card_last_4' => 'nullable|string|max:10',
+            'payments.*.card_expiration' => 'nullable|string|max:10',
+            'payments.*.card_authorization_code' => 'nullable|string|max:100',
+            'payments.*.transfer_bank_id' => 'nullable|exists:banks,id',
+            'payments.*.transfer_authorization_code' => 'nullable|string|max:100',
+            'payments.*.proof_of_payment' => 'nullable',
             'has_initial_payment' => 'nullable|boolean',
             'initial_payment_amount' => ($request->input('payment_type') === 'credit' && $request->boolean('has_initial_payment')) ? 'required|numeric|min:0.01' : 'nullable|numeric|min:0',
             'initial_payment_type' => ($request->input('payment_type') === 'credit' && $request->boolean('has_initial_payment')) ? 'required|in:cash,credit card,bank transfer,check' : 'nullable',
@@ -71,6 +83,7 @@ class SpecimenGroupController extends Controller
             'proof_of_payment' => [
                 (
                     $request->input('payment_type') === 'cash' ||
+                    $request->input('payment_type') === 'mixed' ||
                     ($request->input('payment_type') === 'credit' && ! $request->boolean('has_initial_payment')) ||
                     ($request->input('payment_type') === 'credit' && $request->boolean('has_initial_payment') && $request->input('initial_payment_type') === 'cash')
                 ) ? 'nullable' : 'required',
@@ -257,6 +270,8 @@ class SpecimenGroupController extends Controller
                 }
             } elseif ($request->hasFile('proof_of_payment')) {
                 $proofOfPaymentPath = $this->storeUploadedFile($request->file('proof_of_payment'), 'proofs');
+            } elseif ($validated['payment_type'] === 'mixed') {
+                $proofOfPaymentPath = null;
             } else {
                 $proofOfPaymentPath = 'Efectivo';
             }
@@ -279,7 +294,7 @@ class SpecimenGroupController extends Controller
                 $creditId = $credit->id;
             }
 
-            $totalPaid = in_array($validated['payment_type'], ['cash', 'credit card', 'bank transfer', 'check']) ? $subtotal : $initialPaymentAmount;
+            $totalPaid = in_array($validated['payment_type'], ['cash', 'credit card', 'bank transfer', 'check', 'mixed']) ? $subtotal : $initialPaymentAmount;
 
             // Create primary Group Invoice
             $invoice = Invoice::create([
@@ -324,6 +339,12 @@ class SpecimenGroupController extends Controller
                 'is_group' => true,
                 'group_id' => null, // Set in the next step
             ]);
+
+            if ($invoice->payment_type === 'mixed') {
+                InvoicePaymentService::syncPayments($invoice, $request->input('payments', []), $request);
+            } else {
+                $invoice->payments()->delete();
+            }
 
             // Get Global Customer
             $globalCustomer = Customer::findOrFail($validated['global_customer_id']);
@@ -911,7 +932,7 @@ class SpecimenGroupController extends Controller
                 }
             }
 
-            $totalPaid = in_array($validated['payment_type'], ['cash', 'credit card', 'bank transfer', 'check']) ? $subtotal : $initialPaymentAmount;
+            $totalPaid = in_array($validated['payment_type'], ['cash', 'credit card', 'bank transfer', 'check', 'mixed']) ? $subtotal : $initialPaymentAmount;
 
             // Update primary Group Invoice
             $invoice->update([
@@ -942,6 +963,12 @@ class SpecimenGroupController extends Controller
                 'transfer_value' => isset($validated['transfer_value']) ? (float) $validated['transfer_value'] : null,
                 'transfer_authorization_code' => $validated['transfer_authorization_code'] ?? null,
             ]);
+
+            if ($invoice->payment_type === 'mixed') {
+                InvoicePaymentService::syncPayments($invoice, $request->input('payments', []), $request);
+            } else {
+                $invoice->payments()->delete();
+            }
             $activeSpecimenIds = [];
             $createdSpecimensDataForPdf = [];
             $specimensData = $validated['specimens'];

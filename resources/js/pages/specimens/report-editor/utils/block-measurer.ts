@@ -3,374 +3,374 @@ import { decodeHtmlEntities } from './pagination-helpers';
 import { removeHyperlinks } from './paste-cleaner';
 
 export function getBlockLineHeight(
-	block: { html?: string },
-	baseLineHeight: number,
+    block: { html?: string },
+    baseLineHeight: number,
 ): number {
-	if (!block.html) {
-		return baseLineHeight;
-	}
+    if (!block.html) {
+        return baseLineHeight;
+    }
 
-	const html = block.html;
-	let fontSize = 2.82; // Default 8pt in mm
+    const html = block.html;
+    let fontSize = 2.82; // Default 8pt in mm
 
-	let hasPt = false;
-	let hasPx = false;
-	let maxPt = 8.0;
-	let maxPx = 10.66;
+    let hasPt = false;
+    let hasPx = false;
+    let maxPt = 8.0;
+    let maxPx = 10.66;
 
-	const ptRegex = /font-size:\s*([\d.]+)pt/gi;
-	let match;
+    const ptRegex = /font-size:\s*([\d.]+)pt/gi;
+    let match;
 
-	while ((match = ptRegex.exec(html)) !== null) {
-		const val = parseFloat(match[1]);
+    while ((match = ptRegex.exec(html)) !== null) {
+        const val = parseFloat(match[1]);
 
-		if (val > maxPt) {
-			maxPt = val;
-		}
+        if (val > maxPt) {
+            maxPt = val;
+        }
 
-		hasPt = true;
-	}
+        hasPt = true;
+    }
 
-	if (!hasPt) {
-		const pxRegex = /font-size:\s*([\d.]+)px/gi;
+    if (!hasPt) {
+        const pxRegex = /font-size:\s*([\d.]+)px/gi;
 
-		while ((match = pxRegex.exec(html)) !== null) {
-			const val = parseFloat(match[1]);
+        while ((match = pxRegex.exec(html)) !== null) {
+            const val = parseFloat(match[1]);
 
-			if (val > maxPx) {
-				maxPx = val;
-			}
+            if (val > maxPx) {
+                maxPx = val;
+            }
 
-			hasPx = true;
-		}
-	}
+            hasPx = true;
+        }
+    }
 
-	if (hasPt) {
-		fontSize = maxPt * 0.352777;
-	} else if (hasPx) {
-		fontSize = maxPx * 0.264583;
-	}
+    if (hasPt) {
+        fontSize = maxPt * 0.352777;
+    } else if (hasPx) {
+        fontSize = maxPx * 0.264583;
+    }
 
-	let multiplier = 1.25; // Default multiplier
-	const lhMatch = html.match(/line-height:\s*([\d.]+)/i);
+    let multiplier = 1.25; // Default multiplier
+    const lhMatch = html.match(/line-height:\s*([\d.]+)/i);
 
-	if (lhMatch) {
-		multiplier = parseFloat(lhMatch[1]);
-	}
+    if (lhMatch) {
+        multiplier = parseFloat(lhMatch[1]);
+    }
 
-	return fontSize * multiplier;
+    return fontSize * multiplier;
 }
 
 export function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
-	blockHtml = removeHyperlinks(blockHtml);
-	const tagMatch = blockHtml.match(/^<([a-zA-Z0-9]+)/);
-	const tag = tagMatch ? tagMatch[1].toLowerCase() : 'p';
+    blockHtml = removeHyperlinks(blockHtml);
+    const tagMatch = blockHtml.match(/^<([a-zA-Z0-9]+)/);
+    const tag = tagMatch ? tagMatch[1].toLowerCase() : 'p';
 
-	if (blockHtml.includes('data-type="image-grid"')) {
-		let columns = 2;
-		const colMatch = blockHtml.match(/data-columns=["'](\d+)["']/i);
+    if (blockHtml.includes('data-type="image-grid"')) {
+        let columns = 2;
+        const colMatch = blockHtml.match(/data-columns=["'](\d+)["']/i);
 
-		if (colMatch) {
-			columns = parseInt(colMatch[1], 10);
-		}
+        if (colMatch) {
+            columns = parseInt(colMatch[1], 10);
+        }
 
-		if (columns < 1) {
-			columns = 2;
-		}
+        if (columns < 1) {
+            columns = 2;
+        }
 
-		let align = 'center';
-		const alignMatch = blockHtml.match(/data-align=["']([^"']+)["']/i);
+        let align = 'center';
+        const alignMatch = blockHtml.match(/data-align=["']([^"']+)["']/i);
 
-		if (alignMatch) {
-			align = alignMatch[1];
-		}
+        if (alignMatch) {
+            align = alignMatch[1];
+        }
 
-		let width: number | null = null;
-		const widthMatch = blockHtml.match(
-			/(?:width|data-width)=["'](\d+)["']/i,
-		);
+        let width: number | null = null;
+        const widthMatch = blockHtml.match(
+            /(?:width|data-width)=["'](\d+)["']/i,
+        );
 
-		if (widthMatch) {
-			width = parseInt(widthMatch[1], 10);
-		}
+        if (widthMatch) {
+            width = parseInt(widthMatch[1], 10);
+        }
 
-		const imgRegex = /<img[^>]+>/gi;
-		const imgTags: string[] = [];
-		let match;
+        const imgRegex = /<img[^>]+>/gi;
+        const imgTags: string[] = [];
+        let match;
 
-		while ((match = imgRegex.exec(blockHtml)) !== null) {
-			imgTags.push(match[0]);
-		}
+        while ((match = imgRegex.exec(blockHtml)) !== null) {
+            imgTags.push(match[0]);
+        }
 
-		const indexedTags = imgTags.map((tag, originalIndex) => {
-			const orderMatch = tag.match(/data-order=["'](\d+)["']/i);
+        const indexedTags = imgTags.map((tag, originalIndex) => {
+            const orderMatch = tag.match(/data-order=["'](\d+)["']/i);
 
-			return {
-				tag,
-				originalIndex,
-				order: orderMatch ? parseInt(orderMatch[1], 10) : null,
-			};
-		});
+            return {
+                tag,
+                originalIndex,
+                order: orderMatch ? parseInt(orderMatch[1], 10) : null,
+            };
+        });
 
-		indexedTags.sort((a, b) => {
-			if (a.order !== null && b.order !== null) {
-				if (a.order !== b.order) {
-					return a.order - b.order;
-				}
-			}
+        indexedTags.sort((a, b) => {
+            if (a.order !== null && b.order !== null) {
+                if (a.order !== b.order) {
+                    return a.order - b.order;
+                }
+            }
 
-			return a.originalIndex - b.originalIndex;
-		});
+            return a.originalIndex - b.originalIndex;
+        });
 
-		const sortedTags = indexedTags.map((item) => item.tag);
+        const sortedTags = indexedTags.map((item) => item.tag);
 
-		const usableWidth = width ? 185.9 * (width / 704) : 185.9;
-		const gap = 1.5; // mm
+        const usableWidth = width ? 185.9 * (width / 704) : 185.9;
+        const gap = 1.5; // mm
 
-		// Group images into a single row of up to 4 images
-		const slicedTags = sortedTags.slice(0, 4);
-		const rowsOfImages: string[][] = [slicedTags];
+        // Group images into a single row of up to 4 images
+        const slicedTags = sortedTags.slice(0, 4);
+        const rowsOfImages: string[][] = [slicedTags];
 
-		let gridHeight = 2.0;
-		rowsOfImages.forEach((rowImages, i) => {
-			let aspectSum = 0.0;
-			rowImages.forEach((imgTag) => {
-				const aspect = getImageAspectRatio(imgTag);
+        let gridHeight = 2.0;
+        rowsOfImages.forEach((rowImages, i) => {
+            let aspectSum = 0.0;
+            rowImages.forEach((imgTag) => {
+                const aspect = getImageAspectRatio(imgTag);
 
-				if (aspect > 0.0) {
-					aspectSum += 1.0 / aspect;
-				} else {
-					aspectSum += 1.0;
-				}
-			});
+                if (aspect > 0.0) {
+                    aspectSum += 1.0 / aspect;
+                } else {
+                    aspectSum += 1.0;
+                }
+            });
 
-			if (aspectSum <= 0.0) {
-				aspectSum = 1.0;
-			}
+            if (aspectSum <= 0.0) {
+                aspectSum = 1.0;
+            }
 
-			const N = rowImages.length;
-			const maxRowHeight =
-				N === 1 ? Math.min(120.0, usableWidth) : usableWidth * 1.5;
-			let rowHeight = 0.0;
+            const N = rowImages.length;
+            const maxRowHeight =
+                N === 1 ? Math.min(120.0, usableWidth) : usableWidth * 1.5;
+            let rowHeight = 0.0;
 
-			if (N > 0) {
-				const calculatedHeight =
-					(usableWidth - (N - 1) * gap) / aspectSum;
-				rowHeight = Math.min(calculatedHeight, maxRowHeight);
-			}
+            if (N > 0) {
+                const calculatedHeight =
+                    (usableWidth - (N - 1) * gap) / aspectSum;
+                rowHeight = Math.min(calculatedHeight, maxRowHeight);
+            }
 
-			gridHeight += rowHeight;
+            gridHeight += rowHeight;
 
-			if (i > 0) {
-				gridHeight += 1.5;
-			}
-		});
+            if (i > 0) {
+                gridHeight += 1.5;
+            }
+        });
 
-		return {
-			type: 'image-grid',
-			html: blockHtml,
-			columns,
-			alignment: align,
-			width,
-			images: sortedTags,
-			height: gridHeight,
-			debugMeta: {
-				blockType: 'image-grid',
-				heightMm: gridHeight,
-				colCount: columns,
-				formula: `${sortedTags.length} imágenes en galería (${columns} cols, ancho: ${usableWidth.toFixed(1)}mm) = ${gridHeight.toFixed(2)}mm`,
-			},
-		};
-	}
+        return {
+            type: 'image-grid',
+            html: blockHtml,
+            columns,
+            alignment: align,
+            width,
+            images: sortedTags,
+            height: gridHeight,
+            debugMeta: {
+                blockType: 'image-grid',
+                heightMm: gridHeight,
+                colCount: columns,
+                formula: `${sortedTags.length} imágenes en galería (${columns} cols, ancho: ${usableWidth.toFixed(1)}mm) = ${gridHeight.toFixed(2)}mm`,
+            },
+        };
+    }
 
-	if (
-		blockHtml.includes('page-break') ||
-		blockHtml.includes('page-break-after') ||
-		blockHtml.includes('break-after')
-	) {
-		return {
-			type: 'page-break',
-			html: blockHtml,
-			height: 0.0,
-			debugMeta: {
-				blockType: 'page-break',
-				heightMm: 0.0,
-				formula: 'Salto de página explícito (0.00mm)',
-			},
-		};
-	}
+    if (
+        blockHtml.includes('page-break') ||
+        blockHtml.includes('page-break-after') ||
+        blockHtml.includes('break-after')
+    ) {
+        return {
+            type: 'page-break',
+            html: blockHtml,
+            height: 0.0,
+            debugMeta: {
+                blockType: 'page-break',
+                heightMm: 0.0,
+                formula: 'Salto de página explícito (0.00mm)',
+            },
+        };
+    }
 
-	if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
-		let height = 7.94;
+    if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
+        let height = 7.94;
 
-		if (tag === 'h1') {
-			height = 11.91;
-		} else if (tag === 'h2') {
-			height = 9.925;
-		}
+        if (tag === 'h1') {
+            height = 11.91;
+        } else if (tag === 'h2') {
+            height = 9.925;
+        }
 
-		return {
-			type: 'heading',
-			tag,
-			html: blockHtml,
-			height,
-			debugMeta: {
-				blockType: `heading (${tag.toUpperCase()})`,
-				heightMm: height,
-				keepWithNext: true,
-				formula: `Encabezado <${tag}>: ${height.toFixed(2)}mm (con restricción keep_with_next)`,
-			},
-		};
-	}
+        return {
+            type: 'heading',
+            tag,
+            html: blockHtml,
+            height,
+            debugMeta: {
+                blockType: `heading (${tag.toUpperCase()})`,
+                heightMm: height,
+                keepWithNext: true,
+                formula: `Encabezado <${tag}>: ${height.toFixed(2)}mm (con restricción keep_with_next)`,
+            },
+        };
+    }
 
-	if (tag === 'ul' || tag === 'ol') {
-		return {
-			type: 'list',
-			tag,
-			html: blockHtml,
-			height: 0.0,
-			debugMeta: {
-				blockType: `list (${tag.toUpperCase()})`,
-				heightMm: 0.0,
-			},
-		};
-	}
+    if (tag === 'ul' || tag === 'ol') {
+        return {
+            type: 'list',
+            tag,
+            html: blockHtml,
+            height: 0.0,
+            debugMeta: {
+                blockType: `list (${tag.toUpperCase()})`,
+                heightMm: 0.0,
+            },
+        };
+    }
 
-	if (tag === 'table' || blockHtml.includes('<table')) {
-		return {
-			type: 'table',
-			html: blockHtml,
-			height: 0.0,
-			debugMeta: {
-				blockType: 'table',
-				heightMm: 0.0,
-			},
-		};
-	}
+    if (tag === 'table' || blockHtml.includes('<table')) {
+        return {
+            type: 'table',
+            html: blockHtml,
+            height: 0.0,
+            debugMeta: {
+                blockType: 'table',
+                heightMm: 0.0,
+            },
+        };
+    }
 
-	if (tag === 'img' || blockHtml.includes('<img')) {
-		const srcMatch = blockHtml.match(/src=["']([^"']+)["']/i);
-		const src = srcMatch ? srcMatch[1] : '';
+    if (tag === 'img' || blockHtml.includes('<img')) {
+        const srcMatch = blockHtml.match(/src=["']([^"']+)["']/i);
+        const src = srcMatch ? srcMatch[1] : '';
 
-		const widthMatch =
-			blockHtml.match(/width=["'](\d+)["']/i) ||
-			blockHtml.match(/width:\s*(\d+)px/i);
-		const width = widthMatch ? `${widthMatch[1]}px` : 'auto';
+        const widthMatch =
+            blockHtml.match(/width=["'](\d+)["']/i) ||
+            blockHtml.match(/width:\s*(\d+)px/i);
+        const width = widthMatch ? `${widthMatch[1]}px` : 'auto';
 
-		const heightMatch =
-			blockHtml.match(/height=["'](\d+)["']/i) ||
-			blockHtml.match(/height:\s*(\d+)px/i);
-		const height = heightMatch ? `${heightMatch[1]}px` : 'auto';
+        const heightMatch =
+            blockHtml.match(/height=["'](\d+)["']/i) ||
+            blockHtml.match(/height:\s*(\d+)px/i);
+        const height = heightMatch ? `${heightMatch[1]}px` : 'auto';
 
-		const alignMatch =
-			blockHtml.match(/data-align=["']([^"']+)["']/i) ||
-			blockHtml.match(/class=["']([^"']*align-[^"']*)["']/i);
-		let align = 'center';
+        const alignMatch =
+            blockHtml.match(/data-align=["']([^"']+)["']/i) ||
+            blockHtml.match(/class=["']([^"']*align-[^"']*)["']/i);
+        let align = 'center';
 
-		if (alignMatch) {
-			const alignVal = alignMatch[1];
+        if (alignMatch) {
+            const alignVal = alignMatch[1];
 
-			if (alignVal.includes('left')) {
-				align = 'left';
-			} else if (alignVal.includes('right')) {
-				align = 'right';
-			} else if (alignVal.includes('justify')) {
-				align = 'justify';
-			}
-		}
+            if (alignVal.includes('left')) {
+                align = 'left';
+            } else if (alignVal.includes('right')) {
+                align = 'right';
+            } else if (alignVal.includes('justify')) {
+                align = 'justify';
+            }
+        }
 
-		const captionMatch =
-			blockHtml.match(/data-caption=["']([^"']+)["']/i) ||
-			blockHtml.match(/alt=["']([^"']+)["']/i);
-		const caption = captionMatch ? captionMatch[1] : '';
+        const captionMatch =
+            blockHtml.match(/data-caption=["']([^"']+)["']/i) ||
+            blockHtml.match(/alt=["']([^"']+)["']/i);
+        const caption = captionMatch ? captionMatch[1] : '';
 
-		const isLeft = align === 'left';
-		const isRight = align === 'right';
-		const marginLeft = isLeft ? '0' : 'auto';
-		const marginRight = isRight ? '0' : 'auto';
+        const isLeft = align === 'left';
+        const isRight = align === 'right';
+        const marginLeft = isLeft ? '0' : 'auto';
+        const marginRight = isRight ? '0' : 'auto';
 
-		const imgStyles = [
-			`display: block`,
-			`max-width: 100%`,
-			`height: ${height}`,
-		];
+        const imgStyles = [
+            `display: block`,
+            `max-width: 100%`,
+            `height: ${height}`,
+        ];
 
-		if (width !== 'auto') {
-			imgStyles.push(`width: ${width}`);
-		} else {
-			imgStyles.push(`width: auto`);
-		}
+        if (width !== 'auto') {
+            imgStyles.push(`width: ${width}`);
+        } else {
+            imgStyles.push(`width: auto`);
+        }
 
-		let captionHtml = '';
+        let captionHtml = '';
 
-		if (caption) {
-			captionHtml = `<div class="image-caption" style="text-align: center; margin-top: 1.06mm; font-style: italic; font-size: 8.5pt; color: #64748b; line-height: 1.2;">${caption}</div>`;
-		}
+        if (caption) {
+            captionHtml = `<div class="image-caption" style="text-align: center; margin-top: 1.06mm; font-style: italic; font-size: 8.5pt; color: #64748b; line-height: 1.2;">${caption}</div>`;
+        }
 
-		const wrappedHtml = `<div class="image-wrapper align-${align}" style="display: block; margin-left: ${marginLeft}; margin-right: ${marginRight}; width: fit-content; max-width: 100%;">
+        const wrappedHtml = `<div class="image-wrapper align-${align}" style="display: block; margin-left: ${marginLeft}; margin-right: ${marginRight}; width: fit-content; max-width: 100%;">
             <img src="${src}" class="align-${align}" style="${imgStyles.join('; ')};" />
             ${captionHtml}
         </div>`;
 
-		const widthPx = widthMatch ? parseInt(widthMatch[1], 10) : 360;
-		let captionHeight = 0.0;
+        const widthPx = widthMatch ? parseInt(widthMatch[1], 10) : 360;
+        let captionHeight = 0.0;
 
-		if (caption) {
-			const maxCharsForCaption = Math.max(
-				15,
-				Math.floor(widthPx * 0.176),
-			);
-			const captionLines = Math.max(
-				1,
-				Math.ceil(caption.length / maxCharsForCaption),
-			);
-			captionHeight = captionLines * 3.6 + 1.06;
-		}
+        if (caption) {
+            const maxCharsForCaption = Math.max(
+                15,
+                Math.floor(widthPx * 0.176),
+            );
+            const captionLines = Math.max(
+                1,
+                Math.ceil(caption.length / maxCharsForCaption),
+            );
+            captionHeight = captionLines * 3.6 + 1.06;
+        }
 
-		const imgH = getImageHeight(blockHtml);
-		const totalHeight = imgH + captionHeight;
+        const imgH = getImageHeight(blockHtml);
+        const totalHeight = imgH + captionHeight;
 
-		return {
-			type: 'image',
-			html: wrappedHtml,
-			height: totalHeight,
-			debugMeta: {
-				blockType: 'image',
-				heightMm: totalHeight,
-				formula: `Imagen: ${imgH.toFixed(2)}mm + pie de foto: ${captionHeight.toFixed(2)}mm = ${totalHeight.toFixed(2)}mm (${align})`,
-			},
-		};
-	}
+        return {
+            type: 'image',
+            html: wrappedHtml,
+            height: totalHeight,
+            debugMeta: {
+                blockType: 'image',
+                heightMm: totalHeight,
+                formula: `Imagen: ${imgH.toFixed(2)}mm + pie de foto: ${captionHeight.toFixed(2)}mm = ${totalHeight.toFixed(2)}mm (${align})`,
+            },
+        };
+    }
 
-	const classMatch = blockHtml.match(/class=["']([^"']+)["']/i);
-	const className = classMatch ? classMatch[1] : '';
+    const classMatch = blockHtml.match(/class=["']([^"']+)["']/i);
+    const className = classMatch ? classMatch[1] : '';
 
-	const plainText = decodeHtmlEntities(
-		blockHtml.replace(/<[^>]+>/g, ''),
-	).trim();
-	const fontLh = getBlockLineHeight({ html: blockHtml }, 3.53);
-	const fontSize = fontLh / 1.25;
-	const baseFontSize = 2.82;
-	const dynamicMaxChars = Math.floor(
-		maxCharsPerLine * (baseFontSize / fontSize),
-	);
-	const lines = Math.max(1, Math.ceil(plainText.length / dynamicMaxChars));
-	const paraHeight = lines * fontLh;
+    const plainText = decodeHtmlEntities(
+        blockHtml.replace(/<[^>]+>/g, ''),
+    ).trim();
+    const fontLh = getBlockLineHeight({ html: blockHtml }, 3.53);
+    const fontSize = fontLh / 1.25;
+    const baseFontSize = 2.82;
+    const dynamicMaxChars = Math.floor(
+        maxCharsPerLine * (baseFontSize / fontSize),
+    );
+    const lines = Math.max(1, Math.ceil(plainText.length / dynamicMaxChars));
+    const paraHeight = lines * fontLh;
 
-	return {
-		type: 'paragraph',
-		tag,
-		html: blockHtml,
-		className,
-		height: paraHeight,
-		debugMeta: {
-			blockType: 'paragraph',
-			heightMm: paraHeight,
-			lineCount: lines,
-			fontLineHeightMm: fontLh,
-			charsCount: plainText.length,
-			charsPerLine: dynamicMaxChars,
-			formula: `${lines} línea(s) × ${fontLh.toFixed(2)}mm = ${paraHeight.toFixed(2)}mm (${plainText.length} caracteres @ ~${dynamicMaxChars} chars/línea)`,
-		},
-	};
+    return {
+        type: 'paragraph',
+        tag,
+        html: blockHtml,
+        className,
+        height: paraHeight,
+        debugMeta: {
+            blockType: 'paragraph',
+            heightMm: paraHeight,
+            lineCount: lines,
+            fontLineHeightMm: fontLh,
+            charsCount: plainText.length,
+            charsPerLine: dynamicMaxChars,
+            formula: `${lines} línea(s) × ${fontLh.toFixed(2)}mm = ${paraHeight.toFixed(2)}mm (${plainText.length} caracteres @ ~${dynamicMaxChars} chars/línea)`,
+        },
+    };
 }

@@ -157,6 +157,22 @@ class Invoice extends Model
     }
 
     /**
+     * Get the mixed payment breakdown records associated with this invoice.
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(InvoicePayment::class, 'invoice_id');
+    }
+
+    /**
+     * Determine whether the invoice was paid using mixed payment methods.
+     */
+    public function isMixed(): bool
+    {
+        return $this->payment_type === 'mixed';
+    }
+
+    /**
      * Get the user who created this invoice.
      */
     public function createdBy(): BelongsTo

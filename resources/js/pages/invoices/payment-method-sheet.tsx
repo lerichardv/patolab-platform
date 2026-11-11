@@ -1,4 +1,17 @@
-import { Wallet, CreditCard, Landmark, Receipt, Coins } from 'lucide-react';
+import {
+    Wallet,
+    CreditCard,
+    Landmark,
+    Receipt,
+    Coins,
+    Split,
+    Plus,
+    Trash2,
+    FileText,
+    Upload,
+    X,
+    AlertCircle,
+} from 'lucide-react';
 import { useState, useEffect } from 'react';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -22,6 +35,20 @@ export interface Bank {
     name: string;
 }
 
+export interface PaymentMethodLineItem {
+    id: string;
+    payment_method: 'cash' | 'credit card' | 'bank transfer' | 'check';
+    amount: string;
+    payment_date?: string;
+    check_number?: string;
+    card_last_4?: string;
+    card_expiration?: string;
+    card_authorization_code?: string;
+    transfer_bank_id?: string;
+    transfer_authorization_code?: string;
+    proof_of_payment?: File | string | null;
+}
+
 export interface PaymentData {
     payment_type: string;
     payment_method_date: string;
@@ -38,6 +65,7 @@ export interface PaymentData {
     has_initial_payment: boolean;
     initial_payment_amount: string;
     initial_payment_type: string;
+    payments?: PaymentMethodLineItem[];
 }
 
 export const getPaymentTypeLabel = (type: string): string => {
@@ -45,13 +73,17 @@ export const getPaymentTypeLabel = (type: string): string => {
         case 'cash':
             return 'Efectivo';
         case 'credit card':
+        case 'card':
             return 'Tarjeta de Crédito';
         case 'bank transfer':
+        case 'transfer':
             return 'Transferencia Bancaria';
         case 'check':
             return 'Cheque';
         case 'credit':
             return 'Al Crédito';
+        case 'mixed':
+            return 'Pago Mixto';
         default:
             return type || 'Sin seleccionar';
     }
@@ -137,6 +169,23 @@ export function PaymentMethodSheet({
         Record<string, string>
     >({});
 
+    const [mixedLines, setMixedLines] = useState<PaymentMethodLineItem[]>([
+        {
+            id: '1',
+            payment_method: 'cash',
+            amount: '',
+            proof_of_payment: null,
+        },
+        {
+            id: '2',
+            payment_method: 'bank transfer',
+            amount: '',
+            transfer_bank_id: '',
+            transfer_authorization_code: '',
+            proof_of_payment: null,
+        },
+    ]);
+
     useEffect(() => {
         if (open) {
             setLocalPayment({
@@ -163,8 +212,96 @@ export function PaymentMethodSheet({
                     paymentData.initial_payment_type || 'cash',
             });
             setLocalPaymentErrors({});
+
+            if (paymentData.payments && paymentData.payments.length >= 2) {
+                setMixedLines(
+                    paymentData.payments.map((p, i) => ({
+                        id: p.id || (i + 1).toString(),
+                        payment_method: p.payment_method || 'cash',
+                        amount: p.amount ? p.amount.toString() : '',
+                        payment_date: p.payment_date || '',
+                        check_number: p.check_number || '',
+                        card_last_4: p.card_last_4 || '',
+                        card_expiration: p.card_expiration || '',
+                        card_authorization_code:
+                            p.card_authorization_code || '',
+                        transfer_bank_id: p.transfer_bank_id
+                            ? p.transfer_bank_id.toString()
+                            : '',
+                        transfer_authorization_code:
+                            p.transfer_authorization_code || '',
+                        proof_of_payment: p.proof_of_payment || null,
+                    })),
+                );
+            } else {
+                setMixedLines([
+                    {
+                        id: '1',
+                        payment_method: 'cash',
+                        amount:
+                            totalAmount > 0 ? (totalAmount / 2).toFixed(2) : '',
+                        proof_of_payment: null,
+                    },
+                    {
+                        id: '2',
+                        payment_method: 'bank transfer',
+                        amount:
+                            totalAmount > 0
+                                ? (totalAmount - totalAmount / 2).toFixed(2)
+                                : '',
+                        transfer_bank_id: '',
+                        transfer_authorization_code: '',
+                        proof_of_payment: null,
+                    },
+                ]);
+            }
         }
     }, [open, paymentData]);
+
+    const mixedAssigned = mixedLines.reduce(
+        (acc, l) => acc + (parseFloat(l.amount || '0') || 0),
+        0,
+    );
+    const mixedDifference = Math.abs(totalAmount - mixedAssigned);
+    const isMixedBalanced = mixedDifference < 0.01;
+
+    const handleAddMixedLine = () => {
+        const remaining = Math.max(0, totalAmount - mixedAssigned);
+        setMixedLines((prev) => [
+            ...prev,
+            {
+                id: (prev.length + 1).toString(),
+                payment_method: 'cash',
+                amount: remaining > 0 ? remaining.toFixed(2) : '',
+                proof_of_payment: null,
+            },
+        ]);
+    };
+
+    const handleRemoveMixedLine = (idx: number) => {
+        if (mixedLines.length <= 2) {
+            toast.error(
+                'Debe haber al menos 2 métodos de pago para un pago mixto.',
+            );
+
+            return;
+        }
+
+        setMixedLines((prev) => prev.filter((_, i) => i !== idx));
+    };
+
+    const handleUpdateMixedLine = (
+        idx: number,
+        field: keyof PaymentMethodLineItem,
+        val: any,
+    ) => {
+        setMixedLines((prev) => {
+            const next = [...prev];
+            next[idx] = { ...next[idx], [field]: val };
+
+            return next;
+        });
+    };
 
     const handleSave = () => {
         const errorsMap: Record<string, string> = {};
@@ -338,6 +475,101 @@ export function PaymentMethodSheet({
             }
         }
 
+        if (localPayment.payment_type === 'mixed') {
+            if (mixedLines.length < 2) {
+                errorsMap.mixed =
+                    'Debe registrar al menos 2 métodos de pago para un pago mixto.';
+            }
+
+            let sum = 0;
+            mixedLines.forEach((line, idx) => {
+                const amt = parseFloat(line.amount || '0');
+
+                if (isNaN(amt) || amt <= 0) {
+                    if (line.payment_method === 'cash') {
+                        errorsMap[`mixed_amount_${idx}`] =
+                            'El valor recibido es requerido y debe ser mayor que 0.';
+                    } else if (line.payment_method === 'check') {
+                        errorsMap[`mixed_amount_${idx}`] =
+                            'El valor del cheque es requerido y debe ser mayor que 0.';
+                    } else if (line.payment_method === 'credit card') {
+                        errorsMap[`mixed_amount_${idx}`] =
+                            'El valor cobrado es requerido y debe ser mayor que 0.';
+                    } else if (line.payment_method === 'bank transfer') {
+                        errorsMap[`mixed_amount_${idx}`] =
+                            'El valor transferido es requerido y debe ser mayor que 0.';
+                    } else {
+                        errorsMap[`mixed_amount_${idx}`] =
+                            'El monto debe ser mayor que 0.';
+                    }
+                }
+
+                sum += isNaN(amt) ? 0 : amt;
+
+                if (line.payment_method === 'bank transfer') {
+                    if (
+                        !line.transfer_bank_id ||
+                        line.transfer_bank_id === 'none'
+                    ) {
+                        errorsMap[`mixed_bank_${idx}`] =
+                            'El banco es requerido.';
+                    }
+
+                    if (!line.transfer_authorization_code) {
+                        errorsMap[`mixed_auth_${idx}`] =
+                            'El código de autorización / referencia es requerido.';
+                    }
+
+                    if (!line.proof_of_payment) {
+                        errorsMap[`mixed_proof_${idx}`] =
+                            'El comprobante de pago es requerido.';
+                    }
+                }
+
+                if (line.payment_method === 'check') {
+                    if (!line.check_number) {
+                        errorsMap[`mixed_check_${idx}`] =
+                            'El número de cheque es requerido.';
+                    }
+
+                    if (!line.proof_of_payment) {
+                        errorsMap[`mixed_proof_${idx}`] =
+                            'El comprobante de pago es requerido.';
+                    }
+                }
+
+                if (line.payment_method === 'credit card') {
+                    if (line.card_last_4 && line.card_last_4.length !== 4) {
+                        errorsMap[`mixed_card_${idx}`] =
+                            'Se requieren los últimos 4 dígitos.';
+                    }
+
+                    if (
+                        line.card_expiration &&
+                        !/^(0[1-9]|1[0-2])\/\d{2}(\d{2})?$/.test(
+                            line.card_expiration,
+                        )
+                    ) {
+                        errorsMap[`mixed_exp_${idx}`] =
+                            'El vencimiento debe tener un formato como 12/26 o 12/2026.';
+                    }
+
+                    if (!line.proof_of_payment) {
+                        errorsMap[`mixed_proof_${idx}`] =
+                            'El comprobante de pago es requerido.';
+                    }
+                }
+            });
+
+            if (Math.abs(sum - totalAmount) > 0.01) {
+                errorsMap.mixed_total = `La suma de pagos (L. ${sum.toFixed(
+                    2,
+                )}) no coincide con el total a pagar (L. ${totalAmount.toFixed(
+                    2,
+                )}).`;
+            }
+        }
+
         if (Object.keys(errorsMap).length > 0) {
             setLocalPaymentErrors(errorsMap);
             toast.error(
@@ -347,7 +579,11 @@ export function PaymentMethodSheet({
             return;
         }
 
-        onSave(localPayment);
+        onSave({
+            ...localPayment,
+            payments:
+                localPayment.payment_type === 'mixed' ? mixedLines : undefined,
+        });
     };
 
     return (
@@ -446,6 +682,12 @@ export function PaymentMethodSheet({
                                         </div>
                                     </SelectItem>
                                 )}
+                                <SelectItem value="mixed">
+                                    <div className="flex items-center gap-2">
+                                        <Split className="h-4 w-4 text-primary" />
+                                        <span>Pago Mixto</span>
+                                    </div>
+                                </SelectItem>
                             </SelectContent>
                         </Select>
                         {localPaymentErrors.payment_type && (
@@ -1342,6 +1584,954 @@ export function PaymentMethodSheet({
                         </div>
                     )}
 
+                    {/* Mixed Payment Breakdown */}
+                    {localPayment.payment_type === 'mixed' && (
+                        <div className="flex flex-col gap-4 rounded-lg border bg-muted/30 p-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                        Métodos de Pago Mixtos
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                        Distribuya el monto total entre dos o
+                                        más formas de pago.
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Balance indicator */}
+                            <div
+                                className={`flex items-center justify-between rounded-md border p-2.5 text-xs ${
+                                    isMixedBalanced
+                                        ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300'
+                                        : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300'
+                                }`}
+                            >
+                                <div className="flex items-center gap-1.5 font-medium">
+                                    <AlertCircle className="h-4 w-4 shrink-0" />
+                                    <span>
+                                        {isMixedBalanced
+                                            ? 'Monto total cubierto exactamente'
+                                            : `Diferencia pendiente: L. ${mixedDifference.toFixed(
+                                                  2,
+                                              )}`}
+                                    </span>
+                                </div>
+                                <div className="font-mono text-xs font-semibold">
+                                    L. {mixedAssigned.toFixed(2)} / L.{' '}
+                                    {totalAmount.toFixed(2)}
+                                </div>
+                            </div>
+
+                            {localPaymentErrors.mixed_total && (
+                                <p className="text-xs font-medium text-destructive">
+                                    {localPaymentErrors.mixed_total}
+                                </p>
+                            )}
+                            {localPaymentErrors.mixed && (
+                                <p className="text-xs font-medium text-destructive">
+                                    {localPaymentErrors.mixed}
+                                </p>
+                            )}
+
+                            {/* Lines */}
+                            <div className="space-y-3">
+                                {mixedLines.map((line, idx) => (
+                                    <div
+                                        key={line.id || idx}
+                                        className="space-y-3 rounded-lg border bg-muted/40 p-3.5"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+                                                    {idx + 1}
+                                                </span>
+                                                <span>Método de Pago</span>
+                                            </div>
+                                            {mixedLines.length > 2 && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-6 w-6 p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                                    onClick={() =>
+                                                        handleRemoveMixedLine(
+                                                            idx,
+                                                        )
+                                                    }
+                                                    title="Eliminar línea"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">
+                                                    Forma de Pago
+                                                </Label>
+                                                <Select
+                                                    value={line.payment_method}
+                                                    onValueChange={(val: any) =>
+                                                        handleUpdateMixedLine(
+                                                            idx,
+                                                            'payment_method',
+                                                            val,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger className="h-9">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="z-[120]">
+                                                        <SelectItem value="cash">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Wallet className="h-3.5 w-3.5 text-primary" />
+                                                                <span>
+                                                                    Efectivo
+                                                                </span>
+                                                            </div>
+                                                        </SelectItem>
+                                                        <SelectItem value="credit card">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <CreditCard className="h-3.5 w-3.5 text-primary" />
+                                                                <span>
+                                                                    Tarjeta de
+                                                                    Crédito
+                                                                </span>
+                                                            </div>
+                                                        </SelectItem>
+                                                        <SelectItem value="bank transfer">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Landmark className="h-3.5 w-3.5 text-primary" />
+                                                                <span>
+                                                                    Transferencia
+                                                                    Bancaria
+                                                                </span>
+                                                            </div>
+                                                        </SelectItem>
+                                                        <SelectItem value="check">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Receipt className="h-3.5 w-3.5 text-primary" />
+                                                                <span>
+                                                                    Cheque
+                                                                </span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            {/* Cash specific fields */}
+                                            {line.payment_method === 'cash' && (
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">
+                                                        Valor Recibido (L.){' '}
+                                                        <span className="text-destructive">
+                                                            *
+                                                        </span>
+                                                    </Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        className="h-9 font-mono"
+                                                        value={line.amount}
+                                                        onChange={(e) =>
+                                                            handleUpdateMixedLine(
+                                                                idx,
+                                                                'amount',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="0.00"
+                                                        required
+                                                    />
+                                                    {localPaymentErrors[
+                                                        `mixed_amount_${idx}`
+                                                    ] && (
+                                                        <p className="text-[10px] text-destructive">
+                                                            {
+                                                                localPaymentErrors[
+                                                                    `mixed_amount_${idx}`
+                                                                ]
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Credit card specific fields */}
+                                            {line.payment_method ===
+                                                'credit card' && (
+                                                <div className="space-y-3">
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div className="space-y-1">
+                                                            <Label className="text-xs">
+                                                                Últimos 4
+                                                                Dígitos
+                                                            </Label>
+                                                            <Input
+                                                                type="text"
+                                                                maxLength={4}
+                                                                className="h-9 font-mono"
+                                                                value={
+                                                                    line.card_last_4 ||
+                                                                    ''
+                                                                }
+                                                                onChange={(e) =>
+                                                                    handleUpdateMixedLine(
+                                                                        idx,
+                                                                        'card_last_4',
+                                                                        e.target.value
+                                                                            .replace(
+                                                                                /\D/g,
+                                                                                '',
+                                                                            )
+                                                                            .slice(
+                                                                                0,
+                                                                                4,
+                                                                            ),
+                                                                    )
+                                                                }
+                                                                placeholder="1234"
+                                                            />
+                                                            {localPaymentErrors[
+                                                                `mixed_card_${idx}`
+                                                            ] && (
+                                                                <p className="text-[10px] text-destructive">
+                                                                    {
+                                                                        localPaymentErrors[
+                                                                            `mixed_card_${idx}`
+                                                                        ]
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <Label className="text-xs">
+                                                                Vencimiento
+                                                            </Label>
+                                                            <Input
+                                                                type="text"
+                                                                maxLength={7}
+                                                                className="h-9 font-mono"
+                                                                value={
+                                                                    line.card_expiration ||
+                                                                    ''
+                                                                }
+                                                                onChange={(e) =>
+                                                                    handleUpdateMixedLine(
+                                                                        idx,
+                                                                        'card_expiration',
+                                                                        formatCardExpiration(
+                                                                            e
+                                                                                .target
+                                                                                .value,
+                                                                        ),
+                                                                    )
+                                                                }
+                                                                placeholder="MM/AA"
+                                                            />
+                                                            {localPaymentErrors[
+                                                                `mixed_exp_${idx}`
+                                                            ] && (
+                                                                <p className="text-[10px] text-destructive">
+                                                                    {
+                                                                        localPaymentErrors[
+                                                                            `mixed_exp_${idx}`
+                                                                        ]
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">
+                                                            Código de
+                                                            Autorización
+                                                        </Label>
+                                                        <Input
+                                                            type="text"
+                                                            className="h-9 font-mono"
+                                                            value={
+                                                                line.card_authorization_code ||
+                                                                ''
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleUpdateMixedLine(
+                                                                    idx,
+                                                                    'card_authorization_code',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Ej. 987654"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">
+                                                            Monto Cargado (L.){' '}
+                                                            <span className="text-destructive">
+                                                                *
+                                                            </span>
+                                                        </Label>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            className="h-9 font-mono"
+                                                            value={line.amount}
+                                                            onChange={(e) =>
+                                                                handleUpdateMixedLine(
+                                                                    idx,
+                                                                    'amount',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="0.00"
+                                                            required
+                                                        />
+                                                        {localPaymentErrors[
+                                                            `mixed_amount_${idx}`
+                                                        ] && (
+                                                            <p className="text-[10px] text-destructive">
+                                                                {
+                                                                    localPaymentErrors[
+                                                                        `mixed_amount_${idx}`
+                                                                    ]
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Proof of Payment Upload */}
+                                                    <div className="space-y-1.5 pt-1">
+                                                        <Label className="text-xs">
+                                                            Comprobante de Pago
+                                                            (PDF o Imagen){' '}
+                                                            <span className="text-destructive">
+                                                                *
+                                                            </span>
+                                                        </Label>
+                                                        {line.proof_of_payment ? (
+                                                            <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 dark:bg-emerald-500/10">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="rounded-md bg-emerald-500/10 p-2 text-emerald-500">
+                                                                        <FileText className="h-5 w-5" />
+                                                                    </div>
+                                                                    <div className="flex flex-col">
+                                                                        <span className="max-w-[200px] truncate text-xs font-semibold text-foreground sm:max-w-xs">
+                                                                            {typeof line.proof_of_payment ===
+                                                                            'string'
+                                                                                ? line.proof_of_payment
+                                                                                      .split(
+                                                                                          '/',
+                                                                                      )
+                                                                                      .pop()
+                                                                                : line
+                                                                                      .proof_of_payment
+                                                                                      .name}
+                                                                        </span>
+                                                                        <span className="text-[10px] text-muted-foreground">
+                                                                            {typeof line.proof_of_payment ===
+                                                                            'string'
+                                                                                ? 'Archivo guardado'
+                                                                                : `${(line.proof_of_payment.size / 1024 / 1024).toFixed(2)} MB`}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() =>
+                                                                        handleUpdateMixedLine(
+                                                                            idx,
+                                                                            'proof_of_payment',
+                                                                            null,
+                                                                        )
+                                                                    }
+                                                                    className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                                                >
+                                                                    <X className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="group relative">
+                                                                <input
+                                                                    type="file"
+                                                                    id={`sheet_mixed_proof_card_${idx}`}
+                                                                    className="hidden"
+                                                                    accept=".pdf,image/*"
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) => {
+                                                                        const file =
+                                                                            e
+                                                                                .target
+                                                                                .files?.[0] ||
+                                                                            null;
+
+                                                                        if (
+                                                                            file &&
+                                                                            file.size >
+                                                                                30 *
+                                                                                    1024 *
+                                                                                    1024
+                                                                        ) {
+                                                                            toast.error(
+                                                                                'El archivo de comprobante no debe superar los 30 MB.',
+                                                                            );
+                                                                            e.target.value =
+                                                                                '';
+
+                                                                            return;
+                                                                        }
+
+                                                                        handleUpdateMixedLine(
+                                                                            idx,
+                                                                            'proof_of_payment',
+                                                                            file,
+                                                                        );
+                                                                    }}
+                                                                />
+                                                                <label
+                                                                    htmlFor={`sheet_mixed_proof_card_${idx}`}
+                                                                    className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 bg-card p-3 transition-all duration-200 hover:border-primary/50 hover:bg-accent/10"
+                                                                >
+                                                                    <div className="mb-1 rounded-full bg-secondary p-1.5 text-secondary-foreground transition-transform duration-200 group-hover:scale-110">
+                                                                        <Upload className="h-4 w-4" />
+                                                                    </div>
+                                                                    <span className="text-xs font-semibold text-foreground">
+                                                                        Subir
+                                                                        Comprobante
+                                                                    </span>
+                                                                    <span className="mt-0.5 text-[10px] text-muted-foreground">
+                                                                        PDF
+                                                                        hasta
+                                                                        30MB,
+                                                                        imágenes
+                                                                        hasta
+                                                                        10MB
+                                                                    </span>
+                                                                </label>
+                                                            </div>
+                                                        )}
+                                                        {localPaymentErrors[
+                                                            `mixed_proof_${idx}`
+                                                        ] && (
+                                                            <p className="text-[10px] text-destructive">
+                                                                {
+                                                                    localPaymentErrors[
+                                                                        `mixed_proof_${idx}`
+                                                                    ]
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Bank transfer specific fields */}
+                                            {line.payment_method ===
+                                                'bank transfer' && (
+                                                <div className="space-y-3">
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">
+                                                            Banco{' '}
+                                                            <span className="text-destructive">
+                                                                *
+                                                            </span>
+                                                        </Label>
+                                                        <Select
+                                                            value={
+                                                                line.transfer_bank_id ||
+                                                                ''
+                                                            }
+                                                            onValueChange={(
+                                                                val,
+                                                            ) =>
+                                                                handleUpdateMixedLine(
+                                                                    idx,
+                                                                    'transfer_bank_id',
+                                                                    val,
+                                                                )
+                                                            }
+                                                        >
+                                                            <SelectTrigger className="h-9 text-xs">
+                                                                <SelectValue placeholder="Seleccione un Banco" />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="z-[120]">
+                                                                {banks &&
+                                                                banks.length >
+                                                                    0 ? (
+                                                                    banks.map(
+                                                                        (b) => (
+                                                                            <SelectItem
+                                                                                key={
+                                                                                    b.id
+                                                                                }
+                                                                                value={b.id.toString()}
+                                                                                className="text-xs"
+                                                                            >
+                                                                                {
+                                                                                    b.name
+                                                                                }
+                                                                            </SelectItem>
+                                                                        ),
+                                                                    )
+                                                                ) : (
+                                                                    <SelectItem
+                                                                        value="none"
+                                                                        disabled
+                                                                    >
+                                                                        No hay
+                                                                        bancos
+                                                                        registrados
+                                                                    </SelectItem>
+                                                                )}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        {localPaymentErrors[
+                                                            `mixed_bank_${idx}`
+                                                        ] && (
+                                                            <p className="text-[10px] text-destructive">
+                                                                {
+                                                                    localPaymentErrors[
+                                                                        `mixed_bank_${idx}`
+                                                                    ]
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">
+                                                            Código de
+                                                            Autorización /
+                                                            Referencia{' '}
+                                                            <span className="text-destructive">
+                                                                *
+                                                            </span>
+                                                        </Label>
+                                                        <Input
+                                                            type="text"
+                                                            className="h-9 font-mono"
+                                                            value={
+                                                                line.transfer_authorization_code ||
+                                                                ''
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleUpdateMixedLine(
+                                                                    idx,
+                                                                    'transfer_authorization_code',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Ej. 11223344"
+                                                            required
+                                                        />
+                                                        {localPaymentErrors[
+                                                            `mixed_auth_${idx}`
+                                                        ] && (
+                                                            <p className="text-[10px] text-destructive">
+                                                                {
+                                                                    localPaymentErrors[
+                                                                        `mixed_auth_${idx}`
+                                                                    ]
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">
+                                                            Monto Transferido
+                                                            (L.){' '}
+                                                            <span className="text-destructive">
+                                                                *
+                                                            </span>
+                                                        </Label>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            className="h-9 font-mono"
+                                                            value={line.amount}
+                                                            onChange={(e) =>
+                                                                handleUpdateMixedLine(
+                                                                    idx,
+                                                                    'amount',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="0.00"
+                                                            required
+                                                        />
+                                                        {localPaymentErrors[
+                                                            `mixed_amount_${idx}`
+                                                        ] && (
+                                                            <p className="text-[10px] text-destructive">
+                                                                {
+                                                                    localPaymentErrors[
+                                                                        `mixed_amount_${idx}`
+                                                                    ]
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Proof of Payment Upload */}
+                                                    <div className="space-y-1.5 pt-1">
+                                                        <Label className="text-xs">
+                                                            Comprobante de Pago
+                                                            (PDF o Imagen){' '}
+                                                            <span className="text-destructive">
+                                                                *
+                                                            </span>
+                                                        </Label>
+                                                        {line.proof_of_payment ? (
+                                                            <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 dark:bg-emerald-500/10">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="rounded-md bg-emerald-500/10 p-2 text-emerald-500">
+                                                                        <FileText className="h-5 w-5" />
+                                                                    </div>
+                                                                    <div className="flex flex-col">
+                                                                        <span className="max-w-[200px] truncate text-xs font-semibold text-foreground sm:max-w-xs">
+                                                                            {typeof line.proof_of_payment ===
+                                                                            'string'
+                                                                                ? line.proof_of_payment
+                                                                                      .split(
+                                                                                          '/',
+                                                                                      )
+                                                                                      .pop()
+                                                                                : line
+                                                                                      .proof_of_payment
+                                                                                      .name}
+                                                                        </span>
+                                                                        <span className="text-[10px] text-muted-foreground">
+                                                                            {typeof line.proof_of_payment ===
+                                                                            'string'
+                                                                                ? 'Archivo guardado'
+                                                                                : `${(line.proof_of_payment.size / 1024 / 1024).toFixed(2)} MB`}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() =>
+                                                                        handleUpdateMixedLine(
+                                                                            idx,
+                                                                            'proof_of_payment',
+                                                                            null,
+                                                                        )
+                                                                    }
+                                                                    className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                                                >
+                                                                    <X className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="group relative">
+                                                                <input
+                                                                    type="file"
+                                                                    id={`sheet_mixed_proof_transfer_${idx}`}
+                                                                    className="hidden"
+                                                                    accept=".pdf,image/*"
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) => {
+                                                                        const file =
+                                                                            e
+                                                                                .target
+                                                                                .files?.[0] ||
+                                                                            null;
+
+                                                                        if (
+                                                                            file &&
+                                                                            file.size >
+                                                                                30 *
+                                                                                    1024 *
+                                                                                    1024
+                                                                        ) {
+                                                                            toast.error(
+                                                                                'El archivo de comprobante no debe superar los 30 MB.',
+                                                                            );
+                                                                            e.target.value =
+                                                                                '';
+
+                                                                            return;
+                                                                        }
+
+                                                                        handleUpdateMixedLine(
+                                                                            idx,
+                                                                            'proof_of_payment',
+                                                                            file,
+                                                                        );
+                                                                    }}
+                                                                />
+                                                                <label
+                                                                    htmlFor={`sheet_mixed_proof_transfer_${idx}`}
+                                                                    className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 bg-card p-3 transition-all duration-200 hover:border-primary/50 hover:bg-accent/10"
+                                                                >
+                                                                    <div className="mb-1 rounded-full bg-secondary p-1.5 text-secondary-foreground transition-transform duration-200 group-hover:scale-110">
+                                                                        <Upload className="h-4 w-4" />
+                                                                    </div>
+                                                                    <span className="text-xs font-semibold text-foreground">
+                                                                        Subir
+                                                                        Comprobante
+                                                                    </span>
+                                                                    <span className="mt-0.5 text-[10px] text-muted-foreground">
+                                                                        PDF
+                                                                        hasta
+                                                                        30MB,
+                                                                        imágenes
+                                                                        hasta
+                                                                        10MB
+                                                                    </span>
+                                                                </label>
+                                                            </div>
+                                                        )}
+                                                        {localPaymentErrors[
+                                                            `mixed_proof_${idx}`
+                                                        ] && (
+                                                            <p className="text-[10px] text-destructive">
+                                                                {
+                                                                    localPaymentErrors[
+                                                                        `mixed_proof_${idx}`
+                                                                    ]
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Check specific fields */}
+                                            {line.payment_method ===
+                                                'check' && (
+                                                <div className="space-y-3">
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">
+                                                            Número de Cheque{' '}
+                                                            <span className="text-destructive">
+                                                                *
+                                                            </span>
+                                                        </Label>
+                                                        <Input
+                                                            type="text"
+                                                            className="h-9 font-mono"
+                                                            value={
+                                                                line.check_number ||
+                                                                ''
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleUpdateMixedLine(
+                                                                    idx,
+                                                                    'check_number',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Ej. 123456"
+                                                            required
+                                                        />
+                                                        {localPaymentErrors[
+                                                            `mixed_check_${idx}`
+                                                        ] && (
+                                                            <p className="text-[10px] text-destructive">
+                                                                {
+                                                                    localPaymentErrors[
+                                                                        `mixed_check_${idx}`
+                                                                    ]
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">
+                                                            Valor del Cheque
+                                                            (L.){' '}
+                                                            <span className="text-destructive">
+                                                                *
+                                                            </span>
+                                                        </Label>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            className="h-9 font-mono"
+                                                            value={line.amount}
+                                                            onChange={(e) =>
+                                                                handleUpdateMixedLine(
+                                                                    idx,
+                                                                    'amount',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="0.00"
+                                                            required
+                                                        />
+                                                        {localPaymentErrors[
+                                                            `mixed_amount_${idx}`
+                                                        ] && (
+                                                            <p className="text-[10px] text-destructive">
+                                                                {
+                                                                    localPaymentErrors[
+                                                                        `mixed_amount_${idx}`
+                                                                    ]
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Proof of Payment Upload */}
+                                                    <div className="space-y-1.5 pt-1">
+                                                        <Label className="text-xs">
+                                                            Comprobante de Pago
+                                                            (PDF o Imagen){' '}
+                                                            <span className="text-destructive">
+                                                                *
+                                                            </span>
+                                                        </Label>
+                                                        {line.proof_of_payment ? (
+                                                            <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 dark:bg-emerald-500/10">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="rounded-md bg-emerald-500/10 p-2 text-emerald-500">
+                                                                        <FileText className="h-5 w-5" />
+                                                                    </div>
+                                                                    <div className="flex flex-col">
+                                                                        <span className="max-w-[200px] truncate text-xs font-semibold text-foreground sm:max-w-xs">
+                                                                            {typeof line.proof_of_payment ===
+                                                                            'string'
+                                                                                ? line.proof_of_payment
+                                                                                      .split(
+                                                                                          '/',
+                                                                                      )
+                                                                                      .pop()
+                                                                                : line
+                                                                                      .proof_of_payment
+                                                                                      .name}
+                                                                        </span>
+                                                                        <span className="text-[10px] text-muted-foreground">
+                                                                            {typeof line.proof_of_payment ===
+                                                                            'string'
+                                                                                ? 'Archivo guardado'
+                                                                                : `${(line.proof_of_payment.size / 1024 / 1024).toFixed(2)} MB`}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() =>
+                                                                        handleUpdateMixedLine(
+                                                                            idx,
+                                                                            'proof_of_payment',
+                                                                            null,
+                                                                        )
+                                                                    }
+                                                                    className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                                                >
+                                                                    <X className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="group relative">
+                                                                <input
+                                                                    type="file"
+                                                                    id={`sheet_mixed_proof_check_${idx}`}
+                                                                    className="hidden"
+                                                                    accept=".pdf,image/*"
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) => {
+                                                                        const file =
+                                                                            e
+                                                                                .target
+                                                                                .files?.[0] ||
+                                                                            null;
+
+                                                                        if (
+                                                                            file &&
+                                                                            file.size >
+                                                                                30 *
+                                                                                    1024 *
+                                                                                    1024
+                                                                        ) {
+                                                                            toast.error(
+                                                                                'El archivo de comprobante no debe superar los 30 MB.',
+                                                                            );
+                                                                            e.target.value =
+                                                                                '';
+
+                                                                            return;
+                                                                        }
+
+                                                                        handleUpdateMixedLine(
+                                                                            idx,
+                                                                            'proof_of_payment',
+                                                                            file,
+                                                                        );
+                                                                    }}
+                                                                />
+                                                                <label
+                                                                    htmlFor={`sheet_mixed_proof_check_${idx}`}
+                                                                    className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 bg-card p-3 transition-all duration-200 hover:border-primary/50 hover:bg-accent/10"
+                                                                >
+                                                                    <div className="mb-1 rounded-full bg-secondary p-1.5 text-secondary-foreground transition-transform duration-200 group-hover:scale-110">
+                                                                        <Upload className="h-4 w-4" />
+                                                                    </div>
+                                                                    <span className="text-xs font-semibold text-foreground">
+                                                                        Subir
+                                                                        Comprobante
+                                                                    </span>
+                                                                    <span className="mt-0.5 text-[10px] text-muted-foreground">
+                                                                        PDF
+                                                                        hasta
+                                                                        30MB,
+                                                                        imágenes
+                                                                        hasta
+                                                                        10MB
+                                                                    </span>
+                                                                </label>
+                                                            </div>
+                                                        )}
+                                                        {localPaymentErrors[
+                                                            `mixed_proof_${idx}`
+                                                        ] && (
+                                                            <p className="text-[10px] text-destructive">
+                                                                {
+                                                                    localPaymentErrors[
+                                                                        `mixed_proof_${idx}`
+                                                                    ]
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="w-full gap-2 border-dashed font-medium"
+                                onClick={handleAddMixedLine}
+                            >
+                                <Plus className="h-4 w-4" />
+                                Agregar Otro Método
+                            </Button>
+                        </div>
+                    )}
+
                     <div className="mt-4 flex gap-3">
                         <Button
                             type="button"
@@ -1399,6 +2589,9 @@ export function PaymentResume({ data, banks, className }: PaymentResumeProps) {
                     )}
                     {data.payment_type === 'check' && (
                         <Receipt className="h-3.5 w-3.5 text-primary" />
+                    )}
+                    {data.payment_type === 'mixed' && (
+                        <Split className="h-3.5 w-3.5 text-primary" />
                     )}
                     {label}
                 </span>
@@ -1592,6 +2785,26 @@ export function PaymentResume({ data, banks, className }: PaymentResumeProps) {
                             )}
                         </>
                     )}
+                </>
+            )}
+            {data.payment_type === 'mixed' && (
+                <>
+                    <div className="flex justify-between">
+                        <span>Líneas de Pago:</span>
+                        <span className="font-semibold text-foreground">
+                            {data.payments?.length || 0} métodos
+                        </span>
+                    </div>
+                    {data.payments?.map((p, i) => (
+                        <div key={i} className="flex justify-between text-xs">
+                            <span className="capitalize">
+                                {getPaymentTypeLabel(p.payment_method)}:
+                            </span>
+                            <span className="font-mono font-semibold text-foreground">
+                                L. {parseFloat(p.amount || '0').toFixed(2)}
+                            </span>
+                        </div>
+                    ))}
                 </>
             )}
         </div>

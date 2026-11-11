@@ -594,7 +594,8 @@ export const BalanceFiltersBar: React.FC<BalanceFiltersProps> = ({
                         aria-expanded={isCategoryFilterOpen}
                         className={cn(
                             'h-10 justify-between gap-2 border bg-card text-sm font-medium transition-colors hover:bg-accent/50',
-                            isCategoryFiltered && 'border-primary/50 text-primary',
+                            isCategoryFiltered &&
+                                'border-primary/50 text-primary',
                         )}
                     >
                         <div className="flex items-center gap-2 truncate">

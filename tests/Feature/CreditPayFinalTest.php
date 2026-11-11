@@ -595,3 +595,150 @@ test('payFinal with custom invoice_date updates invoice date directly', function
     $credit->refresh();
     expect($credit->status)->toEqual('invoice generated');
 });
+
+test('credit mark as paid with mixed payments saves invoice payments lines and sets status to paid', function () {
+    $specimen = Specimen::create([
+        'sequence_code' => 'BIO-0004-08-2026',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->type->id,
+        'specimen_type_examination' => $this->examination->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'status' => 'received',
+        'priority_id' => $this->priority->id,
+        'quantity' => 1,
+    ]);
+
+    $credit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 500.00,
+        'amount_paid' => 0.00,
+        'amount_remaining' => 500.00,
+        'is_group' => true,
+        'status' => 'invoice generated',
+    ]);
+
+    $originalInvoice = Invoice::create([
+        'customer_id' => $this->customer->id,
+        'created_by_id' => $this->user->id,
+        'payment_type' => 'credit',
+        'amount' => 500.00,
+        'discount' => 0.00,
+        'subtotal' => 500.00,
+        'exempt_amount' => 500.00,
+        'tax_exempt_amount' => 500.00,
+        'total' => 500.00,
+        'total_paid' => 0.00,
+        'invoice_file' => 'invoices/original.pdf',
+        'credit_payment_id' => $credit->id,
+        'is_group' => true,
+        'quantity' => 1,
+    ]);
+
+    $pdfServiceMock = Mockery::mock(InvoicePdfService::class);
+    $pdfServiceMock->shouldReceive('generateAndStoreInvoice')->once();
+    app()->instance(InvoicePdfService::class, $pdfServiceMock);
+
+    $response = $this->actingAs($this->user)->post(route('credits.mark-as-paid', $credit->id), [
+        'payment_type' => 'mixed',
+        'payments' => [
+            [
+                'payment_method' => 'cash',
+                'amount' => 300.00,
+            ],
+            [
+                'payment_method' => 'bank transfer',
+                'amount' => 200.00,
+                'transfer_bank_id' => $this->bank->id,
+                'transfer_authorization_code' => 'TRANS-12345',
+            ],
+        ],
+    ]);
+
+    $response->assertRedirect();
+
+    $credit->refresh();
+    expect((float) $credit->amount_paid)->toBe(500.00);
+    expect((float) $credit->amount_remaining)->toBe(0.00);
+    expect($credit->status)->toBe('paid');
+
+    $originalInvoice->refresh();
+    expect($originalInvoice->payment_type)->toBe('mixed');
+    expect($originalInvoice->payments)->toHaveCount(2);
+    expect((float) $originalInvoice->payments->sum('amount'))->toBe(500.00);
+});
+
+test('mark as paid with mixed payment uploads and saves proof of payment file on invoice_payments', function () {
+    Storage::fake('public');
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'BIO-0005-08-2026',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->type->id,
+        'specimen_type_examination' => $this->examination->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'status' => 'received',
+        'priority_id' => $this->priority->id,
+        'quantity' => 1,
+    ]);
+
+    $credit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 600.00,
+        'amount_paid' => 0.00,
+        'amount_remaining' => 600.00,
+        'is_group' => true,
+        'status' => 'invoice generated',
+    ]);
+
+    $originalInvoice = Invoice::create([
+        'customer_id' => $this->customer->id,
+        'created_by_id' => $this->user->id,
+        'payment_type' => 'credit',
+        'amount' => 600.00,
+        'discount' => 0.00,
+        'subtotal' => 600.00,
+        'exempt_amount' => 600.00,
+        'tax_exempt_amount' => 600.00,
+        'total' => 600.00,
+        'total_paid' => 0.00,
+        'invoice_file' => 'invoices/original_file.pdf',
+        'credit_payment_id' => $credit->id,
+        'is_group' => true,
+        'quantity' => 1,
+    ]);
+
+    $pdfServiceMock = Mockery::mock(InvoicePdfService::class);
+    $pdfServiceMock->shouldReceive('generateAndStoreInvoice')->once();
+    app()->instance(InvoicePdfService::class, $pdfServiceMock);
+
+    $fakeFile = UploadedFile::fake()->create('voucher_mixed.pdf', 250, 'application/pdf');
+
+    $response = $this->actingAs($this->user)->post(route('credits.mark-as-paid', $credit->id), [
+        'payment_type' => 'mixed',
+        'payments' => [
+            [
+                'payment_method' => 'cash',
+                'amount' => 200.00,
+            ],
+            [
+                'payment_method' => 'bank transfer',
+                'amount' => 400.00,
+                'transfer_bank_id' => $this->bank->id,
+                'transfer_authorization_code' => 'TRANS-9988',
+                'proof_of_payment' => $fakeFile,
+            ],
+        ],
+    ]);
+
+    $response->assertRedirect();
+
+    $originalInvoice->refresh();
+    expect($originalInvoice->payments)->toHaveCount(2);
+
+    $bankPayment = $originalInvoice->payments->where('payment_method', 'bank transfer')->first();
+    expect($bankPayment)->not->toBeNull()
+        ->and($bankPayment->proof_of_payment)->not->toBeNull()
+        ->and(Storage::disk('public')->exists($bankPayment->proof_of_payment))->toBeTrue();
+});

@@ -34,6 +34,7 @@ class InvoiceFormDataController extends Controller
                 'customer',
                 'caiRange',
                 'transferBank',
+                'payments.transferBank',
                 'creditRelation',
                 'invoiceSpecimens.examination.prices',
                 'invoiceSpecimens.specimen.customerRelation',
