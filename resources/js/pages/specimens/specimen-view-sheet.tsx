@@ -28,6 +28,7 @@ import {
 import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import HeadingSheet from '@/components/heading-sheet';
+import { StickerPrintDropdown } from '@/components/stickers';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -520,6 +521,14 @@ export default function SpecimenViewSheet({
                             />
                         </div>
                         <div className="flex w-full justify-center gap-2 sm:w-auto sm:justify-start">
+                            {specimen?.id && (
+                                <StickerPrintDropdown
+                                    specimenId={specimen.id}
+                                    cuttingsAvailable={specimen.cuttings || []}
+                                    variant="outline"
+                                    className="flex items-center gap-2"
+                                />
+                            )}
                             {invoice &&
                                 onEditInvoiceClick &&
                                 auth.permissions?.includes('invoices.view') &&

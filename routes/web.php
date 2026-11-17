@@ -21,6 +21,7 @@ use App\Http\Controllers\InventoryProviderController;
 use App\Http\Controllers\InventoryPurchaseOrderController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceFormDataController;
+use App\Http\Controllers\LaboratoryController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MyAssignmentController;
 use App\Http\Controllers\MySpecimenTypeTemplateController;
@@ -51,6 +52,7 @@ use App\Http\Controllers\SpecimenSequenceController;
 use App\Http\Controllers\SpecimenTypeController;
 use App\Http\Controllers\SpecimenTypeExaminationController;
 use App\Http\Controllers\SpecimenTypeTemplateController;
+use App\Http\Controllers\StickerController;
 use App\Http\Controllers\StorageController;
 use App\Http\Controllers\UserCommissionController;
 use App\Http\Controllers\UserCommissionRuleController;
@@ -89,6 +91,7 @@ Route::get('/dev-login', function () {
 
 Route::get('specimen/{specimen_code}', [SpecimenController::class, 'showPublic'])->name('specimens.show-public');
 Route::get('specimen-group/{id}', [SpecimenGroupController::class, 'showPublic'])->name('specimen-groups.show-public');
+Route::get('s/{code}', [StickerController::class, 'redirectShortUrl'])->name('specimens.short-url');
 Route::get('maintenance', fn () => response()->view('errors.503'))->name('maintenance');
 
 // Customer Portal routes
@@ -296,6 +299,14 @@ Route::middleware(['auth:web', 'verified'])->group(function () {
     Route::get('settings/system', [SettingController::class, 'index'])->name('settings.system.index');
     Route::put('settings/system', [SettingController::class, 'update'])->name('settings.system.update');
     Route::post('ai-assistant/chat', [AiAssistantController::class, 'chat'])->name('ai-assistant.chat');
+
+    // Stickers PDF Generation
+    Route::post('stickers/specimens', [StickerController::class, 'generateSpecimensPdf'])->name('stickers.specimens');
+    Route::post('stickers/cuttings', [StickerController::class, 'generateCuttingsPdf'])->name('stickers.cuttings');
+
+    // Laboratories Management
+    Route::get('laboratories', [LaboratoryController::class, 'index'])->name('laboratories.index');
+    Route::post('laboratories', [LaboratoryController::class, 'store'])->name('laboratories.store');
 });
 
 // Route::get('/phpinfo', function () {

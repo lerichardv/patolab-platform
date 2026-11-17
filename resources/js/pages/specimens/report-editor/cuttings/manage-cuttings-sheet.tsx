@@ -14,9 +14,12 @@ import {
     Layers,
     Tag,
     UserPlus,
+    MoreVertical,
+    Printer,
 } from 'lucide-react';
 import { useState, Fragment } from 'react';
 import { toast } from 'sonner';
+import { StickerProgressSheet } from '@/components/stickers';
 import {
     destroy as destroyCutting,
     updateStatus as updateStatusCutting,
@@ -343,6 +346,8 @@ export default function ManageCuttingsSheet({
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [isBulkUpdating, setIsBulkUpdating] = useState(false);
     const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+    const [stickerSheetOpen, setStickerSheetOpen] = useState(false);
+    const [cuttingsToPrint, setCuttingsToPrint] = useState<number[]>([]);
 
     const [prevSearchQuery, setPrevSearchQuery] = useState(searchQuery);
     const [prevOpen, setPrevOpen] = useState(open);
@@ -957,6 +962,25 @@ export default function ManageCuttingsSheet({
                                             </Button>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setCuttingsToPrint(
+                                                        selectedIds,
+                                                    );
+                                                    setStickerSheetOpen(true);
+                                                }}
+                                                disabled={
+                                                    selectedIds.length === 0
+                                                }
+                                                className="h-8 gap-1.5 px-3 text-xs"
+                                            >
+                                                <Printer className="h-3.5 w-3.5" />
+                                                <span>Imprimir Stickers</span>
+                                            </Button>
+
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button
@@ -980,6 +1004,25 @@ export default function ManageCuttingsSheet({
                                                     <DropdownMenuLabel>
                                                         Acciones en Lote
                                                     </DropdownMenuLabel>
+                                                    <DropdownMenuSeparator />
+
+                                                    <DropdownMenuItem
+                                                        onClick={() => {
+                                                            setCuttingsToPrint(
+                                                                selectedIds,
+                                                            );
+                                                            setStickerSheetOpen(
+                                                                true,
+                                                            );
+                                                        }}
+                                                        className="cursor-pointer"
+                                                    >
+                                                        <Printer className="mr-2 h-4 w-4" />
+                                                        <span>
+                                                            Imprimir Stickers de
+                                                            Casette
+                                                        </span>
+                                                    </DropdownMenuItem>
                                                     <DropdownMenuSeparator />
 
                                                     {/* Cambiar Estado Submenu */}
@@ -2055,54 +2098,98 @@ export default function ManageCuttingsSheet({
                                                                                             </SelectContent>
                                                                                         </Select>
                                                                                     )}
-                                                                                    <Button
-                                                                                        variant="ghost"
-                                                                                        size="icon"
-                                                                                        disabled={
-                                                                                            !canEdit
-                                                                                        }
-                                                                                        className="h-8 w-8 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                                                                                        onClick={() =>
-                                                                                            handleDuplicate(
-                                                                                                c,
-                                                                                            )
-                                                                                        }
-                                                                                        title="Duplicar corte"
-                                                                                    >
-                                                                                        <Copy className="h-3.5 w-3.5" />
-                                                                                    </Button>
-                                                                                    <Button
-                                                                                        variant="ghost"
-                                                                                        size="icon"
-                                                                                        disabled={
-                                                                                            !canEdit
-                                                                                        }
-                                                                                        className="h-8 w-8 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                                                                                        onClick={() =>
-                                                                                            handleEdit(
-                                                                                                c,
-                                                                                            )
-                                                                                        }
-                                                                                        title="Editar corte"
-                                                                                    >
-                                                                                        <Edit2 className="h-3.5 w-3.5" />
-                                                                                    </Button>
-                                                                                    <Button
-                                                                                        variant="ghost"
-                                                                                        size="icon"
-                                                                                        disabled={
-                                                                                            !canEdit
-                                                                                        }
-                                                                                        className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                                                                        onClick={() =>
-                                                                                            handleDeleteClick(
-                                                                                                c,
-                                                                                            )
-                                                                                        }
-                                                                                        title="Eliminar corte"
-                                                                                    >
-                                                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                                                    </Button>
+                                                                                    <DropdownMenu>
+                                                                                        <DropdownMenuTrigger
+                                                                                            asChild
+                                                                                        >
+                                                                                            <Button
+                                                                                                variant="ghost"
+                                                                                                size="icon"
+                                                                                                className="h-8 w-8 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                                                                                                title="Más opciones"
+                                                                                            >
+                                                                                                <MoreVertical className="h-4 w-4" />
+                                                                                            </Button>
+                                                                                        </DropdownMenuTrigger>
+                                                                                        <DropdownMenuContent
+                                                                                            align="end"
+                                                                                            className="w-48"
+                                                                                        >
+                                                                                            <DropdownMenuItem
+                                                                                                onClick={() => {
+                                                                                                    setCuttingsToPrint(
+                                                                                                        [
+                                                                                                            c.id,
+                                                                                                        ],
+                                                                                                    );
+                                                                                                    setStickerSheetOpen(
+                                                                                                        true,
+                                                                                                    );
+                                                                                                }}
+                                                                                                className="cursor-pointer gap-2"
+                                                                                            >
+                                                                                                <Printer className="h-4 w-4 text-primary" />
+                                                                                                <span>
+                                                                                                    Imprimir
+                                                                                                    Sticker
+                                                                                                    Casette
+                                                                                                </span>
+                                                                                            </DropdownMenuItem>
+                                                                                            <DropdownMenuSeparator />
+                                                                                            <DropdownMenuItem
+                                                                                                disabled={
+                                                                                                    !canEdit
+                                                                                                }
+                                                                                                onClick={() =>
+                                                                                                    handleEdit(
+                                                                                                        c,
+                                                                                                    )
+                                                                                                }
+                                                                                                className="cursor-pointer gap-2"
+                                                                                            >
+                                                                                                <Edit2 className="h-4 w-4" />
+                                                                                                <span>
+                                                                                                    Editar
+                                                                                                    corte
+                                                                                                </span>
+                                                                                            </DropdownMenuItem>
+                                                                                            <DropdownMenuItem
+                                                                                                disabled={
+                                                                                                    !canEdit
+                                                                                                }
+                                                                                                onClick={() =>
+                                                                                                    handleDuplicate(
+                                                                                                        c,
+                                                                                                    )
+                                                                                                }
+                                                                                                className="cursor-pointer gap-2"
+                                                                                            >
+                                                                                                <Copy className="h-4 w-4" />
+                                                                                                <span>
+                                                                                                    Duplicar
+                                                                                                    corte
+                                                                                                </span>
+                                                                                            </DropdownMenuItem>
+                                                                                            <DropdownMenuSeparator />
+                                                                                            <DropdownMenuItem
+                                                                                                disabled={
+                                                                                                    !canEdit
+                                                                                                }
+                                                                                                onClick={() =>
+                                                                                                    handleDeleteClick(
+                                                                                                        c,
+                                                                                                    )
+                                                                                                }
+                                                                                                className="cursor-pointer gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                                                                            >
+                                                                                                <Trash2 className="h-4 w-4" />
+                                                                                                <span>
+                                                                                                    Eliminar
+                                                                                                    corte
+                                                                                                </span>
+                                                                                            </DropdownMenuItem>
+                                                                                        </DropdownMenuContent>
+                                                                                    </DropdownMenu>
                                                                                 </div>
                                                                             </TableCell>
                                                                         </TableRow>
@@ -2252,6 +2339,16 @@ export default function ManageCuttingsSheet({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <StickerProgressSheet
+                open={stickerSheetOpen}
+                onOpenChange={setStickerSheetOpen}
+                initialType="casette"
+                cuttingIds={cuttingsToPrint}
+                autoStart={true}
+                title="Stickers de Casette (Zebra ZD620)"
+                description="Generando etiquetas de 0.75x0.20 in con código de bloque y datos del paciente."
+            />
         </>
     );
 }

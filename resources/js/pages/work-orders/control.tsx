@@ -38,6 +38,7 @@ import {
     getLast2WeeksRange,
 } from '@/components/date-range-picker';
 import { RealtimeStatusBadge } from '@/components/realtime-status-badge';
+import { StickerPrintDropdown } from '@/components/stickers';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -1473,6 +1474,20 @@ export default function HistotechnologistWorkOrdersControl({
                                                             >
                                                                 <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                                                             </Button>
+                                                        )}
+                                                        {wo.specimen && (
+                                                            <StickerPrintDropdown
+                                                                specimenId={
+                                                                    wo.specimen
+                                                                        .id
+                                                                }
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                showLabel={
+                                                                    false
+                                                                }
+                                                                className="h-5 w-5 text-muted-foreground hover:text-primary"
+                                                            />
                                                         )}
                                                     </div>
                                                 </TableCell>

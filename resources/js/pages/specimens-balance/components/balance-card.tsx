@@ -2,6 +2,7 @@ import { Draggable } from '@hello-pangea/dnd';
 import { CalendarClock, Edit2, Eye, MoreVertical, Users } from 'lucide-react';
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
+import { StickerPrintDropdown } from '@/components/stickers';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -112,9 +113,18 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
                                 </div>
                             )}
                             {specimen.sequence_code && (
-                                <span className="rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
-                                    {specimen.sequence_code}
-                                </span>
+                                <div className="flex items-center gap-1">
+                                    <span className="rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
+                                        {specimen.sequence_code}
+                                    </span>
+                                    <StickerPrintDropdown
+                                        specimenId={specimen.id}
+                                        variant="ghost"
+                                        size="icon"
+                                        showLabel={false}
+                                        className="h-4 w-4 p-0 text-muted-foreground hover:text-primary"
+                                    />
+                                </div>
                             )}
                             {specimen.group_name && (
                                 <Badge

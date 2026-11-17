@@ -32,10 +32,14 @@ import {
     ArrowRight,
     Loader2,
     Mail,
+    Printer,
+    QrCode,
 } from 'lucide-react';
 import { Scissors } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { StickerProgressSheet } from '@/components/stickers';
+import type { StickerType } from '@/components/stickers';
 import { advanceStatus as advanceSpecimenStatus } from '@/actions/App/Http/Controllers/SpecimenController';
 import {
     DateRangePicker,
@@ -593,6 +597,13 @@ export default function MyAssignmentsIndex({
     const [specimenToAdvance, setSpecimenToAdvance] = useState<Specimen | null>(
         null,
     );
+
+    const [stickerSheetOpen, setStickerSheetOpen] = useState(false);
+    const [stickerSheetType, setStickerSheetType] =
+        useState<StickerType>('muestra');
+    const [stickerTargetSpecimenIds, setStickerTargetSpecimenIds] = useState<
+        number[]
+    >([]);
 
     const handleAdvanceStatus = (specimen: Specimen) => {
         setSpecimenToAdvance(specimen);
@@ -1678,6 +1689,42 @@ export default function MyAssignmentsIndex({
                                             <UserPlus className="mr-2 h-4 w-4" />
                                             <span>Asignar Colaboradores</span>
                                         </DropdownMenuItem>
+
+                                        <DropdownMenuSeparator />
+
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                setStickerTargetSpecimenIds(
+                                                    selectedIds,
+                                                );
+                                                setStickerSheetType('casette');
+                                                setStickerSheetOpen(true);
+                                            }}
+                                            className="cursor-pointer gap-2"
+                                        >
+                                            <Printer className="h-4 w-4 text-primary" />
+                                            <span>
+                                                Imprimir Stickers de Casette
+                                                (Lote)
+                                            </span>
+                                        </DropdownMenuItem>
+
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                setStickerTargetSpecimenIds(
+                                                    selectedIds,
+                                                );
+                                                setStickerSheetType('muestra');
+                                                setStickerSheetOpen(true);
+                                            }}
+                                            className="cursor-pointer gap-2"
+                                        >
+                                            <QrCode className="h-4 w-4 text-primary" />
+                                            <span>
+                                                Imprimir Stickers para Frascos
+                                                (Lote)
+                                            </span>
+                                        </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
@@ -2473,6 +2520,77 @@ export default function MyAssignmentsIndex({
                                                                                             Colaboradores
                                                                                         </span>
                                                                                     </DropdownMenuItem>
+                                                                                    <DropdownMenuSeparator />
+                                                                                    <DropdownMenuItem
+                                                                                        onClick={() => {
+                                                                                            setStickerTargetSpecimenIds(
+                                                                                                [
+                                                                                                    specimen.id,
+                                                                                                ],
+                                                                                            );
+                                                                                            setStickerSheetType(
+                                                                                                'muestra',
+                                                                                            );
+                                                                                            setStickerSheetOpen(
+                                                                                                true,
+                                                                                            );
+                                                                                        }}
+                                                                                        className="group cursor-pointer gap-2"
+                                                                                    >
+                                                                                        <QrCode className="h-4 w-4 text-primary" />
+                                                                                        <span>
+                                                                                            Imprimir
+                                                                                            Sticker
+                                                                                            Frasco
+                                                                                        </span>
+                                                                                    </DropdownMenuItem>
+                                                                                    <DropdownMenuItem
+                                                                                        onClick={() => {
+                                                                                            setStickerTargetSpecimenIds(
+                                                                                                [
+                                                                                                    specimen.id,
+                                                                                                ],
+                                                                                            );
+                                                                                            setStickerSheetType(
+                                                                                                'muestra',
+                                                                                            );
+                                                                                            setStickerSheetOpen(
+                                                                                                true,
+                                                                                            );
+                                                                                        }}
+                                                                                        className="group cursor-pointer gap-2"
+                                                                                    >
+                                                                                        <Scissors className="h-4 w-4 text-primary" />
+                                                                                        <span>
+                                                                                            Imprimir
+                                                                                            Sticker
+                                                                                            Corte
+                                                                                        </span>
+                                                                                    </DropdownMenuItem>
+                                                                                    <DropdownMenuItem
+                                                                                        onClick={() => {
+                                                                                            setStickerTargetSpecimenIds(
+                                                                                                [
+                                                                                                    specimen.id,
+                                                                                                ],
+                                                                                            );
+                                                                                            setStickerSheetType(
+                                                                                                'casette',
+                                                                                            );
+                                                                                            setStickerSheetOpen(
+                                                                                                true,
+                                                                                            );
+                                                                                        }}
+                                                                                        className="group cursor-pointer gap-2"
+                                                                                    >
+                                                                                        <Printer className="h-4 w-4 text-primary" />
+                                                                                        <span>
+                                                                                            Imprimir
+                                                                                            Stickers
+                                                                                            Casette
+                                                                                        </span>
+                                                                                    </DropdownMenuItem>
+                                                                                    <DropdownMenuSeparator />
                                                                                     {(() => {
                                                                                         const isSendReportAllowed =
                                                                                             [
@@ -2746,6 +2864,14 @@ export default function MyAssignmentsIndex({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <StickerProgressSheet
+                open={stickerSheetOpen}
+                onOpenChange={setStickerSheetOpen}
+                initialType={stickerSheetType}
+                specimenIds={stickerTargetSpecimenIds}
+                autoStart={true}
+            />
         </>
     );
 }

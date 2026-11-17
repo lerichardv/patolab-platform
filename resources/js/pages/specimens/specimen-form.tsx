@@ -36,6 +36,10 @@ import BlockedPaymentAlertDialog from '@/components/blocked-payment-alert-dialog
 import { DeliveryDatePreview } from '@/components/delivery-date-preview';
 import FormCombobox from '@/components/form-combobox';
 import HeadingSheet from '@/components/heading-sheet';
+import {
+    QuickStickerButton,
+    StickerPrintDropdown,
+} from '@/components/stickers';
 import SpecimenExamChangePriceAlertDialog from '@/components/specimen-exam-change-price-alert-dialog';
 import SpecimenInvoiceSummaryAlertDialog from '@/components/specimen-invoice-summary-alert-dialog';
 import SpecimenRegenerateConfirmAlertDialog from '@/components/specimen-regenerate-confirm-alert-dialog';
@@ -2392,9 +2396,18 @@ export default function SpecimenForm({
                                         <Tag className="h-3.5 w-3.5" /> Código
                                         de Secuencia (Muestra):
                                     </span>
-                                    <span className="font-mono text-sm font-bold text-primary">
-                                        {specimen.sequence_code}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-mono text-sm font-bold text-primary">
+                                            {specimen.sequence_code}
+                                        </span>
+                                        <StickerPrintDropdown
+                                            specimenId={specimen.id}
+                                            variant="ghost"
+                                            size="icon"
+                                            showLabel={false}
+                                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                        />
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="mb-4 flex flex-col gap-1.5 rounded-md border border-amber-500/20 bg-amber-500/5 p-3 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
@@ -4283,9 +4296,31 @@ export default function SpecimenForm({
                                     <Tag className="h-4 w-4 shrink-0 text-emerald-500" />
                                     Código de Muestra Reservado:
                                 </span>
-                                <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
-                                    {data.reserved_code}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                        {data.reserved_code}
+                                    </span>
+                                    <QuickStickerButton
+                                        type="frasco"
+                                        specimenId={specimen?.id}
+                                        previewSpecimens={
+                                            !specimen?.id
+                                                ? [
+                                                      {
+                                                          sequence_code:
+                                                              data.reserved_code,
+                                                          customer_name:
+                                                              selectedCustomer?.name,
+                                                      },
+                                                  ]
+                                                : undefined
+                                        }
+                                        title="Imprimir Sticker para Frasco (Zebra ZD620)"
+                                        size="sm"
+                                        className="h-7 gap-1 border border-emerald-500/30 bg-emerald-500/10 px-2 text-xs text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
+                                        label="Imprimir"
+                                    />
+                                </div>
                             </div>
                         )}
 

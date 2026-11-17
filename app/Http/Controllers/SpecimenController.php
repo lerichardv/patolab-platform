@@ -112,10 +112,12 @@ class SpecimenController extends Controller
             ));
         }
 
+        $searchSpecimen = $request->get('specimen') ?: $request->get('search');
+
         return Inertia::render('specimens/index', [
             'priorities' => app()->runningUnitTests() && ! $request->hasHeader('X-Inertia-Partial-Data') && ! $request->has('test_defer')
-                ? $this->getPrioritiesWithSpecimens($statuses, $specimenTypeIds, $examinationIds, $dateFrom, $dateTo)
-                : Inertia::defer(fn () => $this->getPrioritiesWithSpecimens($statuses, $specimenTypeIds, $examinationIds, $dateFrom, $dateTo)),
+                ? $this->getPrioritiesWithSpecimens($statuses, $specimenTypeIds, $examinationIds, $dateFrom, $dateTo, $searchSpecimen)
+                : Inertia::defer(fn () => $this->getPrioritiesWithSpecimens($statuses, $specimenTypeIds, $examinationIds, $dateFrom, $dateTo, $searchSpecimen)),
             'specimenTypes' => SpecimenType::with('activeStates')->where('active', true)->get(),
             'examinations' => SpecimenTypeExamination::where('active', true)->with('prices')->get(),
             'settings' => Setting::all()->pluck('setting_value', 'setting_key'),
@@ -126,6 +128,7 @@ class SpecimenController extends Controller
                 'examination_id' => $examinationIds === null ? 'all' : (empty($examinationIds) ? 'none' : $examinationIds),
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
+                'search' => $request->get('search'),
             ],
         ]);
     }
@@ -133,42 +136,53 @@ class SpecimenController extends Controller
     /**
      * Get priorities with eagerly loaded filtered specimens for the Kanban board.
      */
-    protected function getPrioritiesWithSpecimens(array $statuses, ?array $specimenTypeIds, ?array $examinationIds, ?string $dateFrom, ?string $dateTo)
+    protected function getPrioritiesWithSpecimens(array $statuses, ?array $specimenTypeIds, ?array $examinationIds, ?string $dateFrom, ?string $dateTo, ?string $searchSpecimen = null)
     {
         $priorities = Priority::orderBy('order', 'desc')->get();
 
-        $priorities->load(['specimens' => function ($q) use ($statuses, $specimenTypeIds, $examinationIds, $dateFrom, $dateTo) {
+        $priorities->load(['specimens' => function ($q) use ($statuses, $specimenTypeIds, $examinationIds, $dateFrom, $dateTo, $searchSpecimen) {
             $q->where('specimen.active', true);
 
-            // Filter by statuses
-            if (! empty($statuses)) {
-                $q->whereIn('specimen.status', $statuses);
-            }
-
-            // Filter by specimen type
-            if ($specimenTypeIds !== null) {
-                if (empty($specimenTypeIds)) {
-                    $q->whereRaw('1 = 0');
-                } else {
-                    $q->whereIn('specimen.specimen_type', $specimenTypeIds);
+            $applyFilters = function ($sub) use ($statuses, $specimenTypeIds, $examinationIds, $dateFrom, $dateTo) {
+                // Filter by statuses
+                if (! empty($statuses)) {
+                    $sub->whereIn('specimen.status', $statuses);
                 }
-            }
 
-            // Filter by examination
-            if ($examinationIds !== null) {
-                if (empty($examinationIds)) {
-                    $q->whereRaw('1 = 0');
-                } else {
-                    $q->whereIn('specimen.specimen_type_examination', $examinationIds);
+                // Filter by specimen type
+                if ($specimenTypeIds !== null) {
+                    if (empty($specimenTypeIds)) {
+                        $sub->whereRaw('1 = 0');
+                    } else {
+                        $sub->whereIn('specimen.specimen_type', $specimenTypeIds);
+                    }
                 }
-            }
 
-            // Filter by date range
-            if (! empty($dateFrom)) {
-                $q->where('specimen.created_at', '>=', $dateFrom.' 00:00:00');
-            }
-            if (! empty($dateTo)) {
-                $q->where('specimen.created_at', '<=', $dateTo.' 23:59:59');
+                // Filter by examination
+                if ($examinationIds !== null) {
+                    if (empty($examinationIds)) {
+                        $sub->whereRaw('1 = 0');
+                    } else {
+                        $sub->whereIn('specimen.specimen_type_examination', $examinationIds);
+                    }
+                }
+
+                // Filter by date range
+                if (! empty($dateFrom)) {
+                    $sub->where('specimen.created_at', '>=', $dateFrom.' 00:00:00');
+                }
+                if (! empty($dateTo)) {
+                    $sub->where('specimen.created_at', '<=', $dateTo.' 23:59:59');
+                }
+            };
+
+            if (! empty($searchSpecimen)) {
+                $q->where(function ($query) use ($applyFilters, $searchSpecimen) {
+                    $query->where($applyFilters)
+                        ->orWhere('specimen.sequence_code', $searchSpecimen);
+                });
+            } else {
+                $applyFilters($q);
             }
 
             $q->with([
@@ -2008,6 +2022,7 @@ class SpecimenController extends Controller
             'group.specimens.examinations',
             'group.specimens.specimenExaminations.examination',
             'report',
+            'cuttings.code',
             'workOrders.task',
             'workOrders.users',
             'cancelledBy',

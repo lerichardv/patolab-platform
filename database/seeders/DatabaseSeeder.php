@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
             CustomerSeeder::class,
             BanksSeeder::class,
             UsersSeeder::class,
+            LaboratorySeeder::class,
             // SpecimenSeeder::class,
         ]);
 

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useMemo } from 'react';
 import HeadingSheet from '@/components/heading-sheet';
+import { StickerPrintDropdown } from '@/components/stickers';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
@@ -116,6 +117,12 @@ export default function InvoiceViewSheet({
         return [];
     }, [invoice]);
 
+    const specimenIdsForStickers = useMemo(() => {
+        if (!invoice) return [];
+        if (invoice.specimen?.id) return [invoice.specimen.id];
+        return groupedSpecimens.map((g: any) => g.specimen?.id).filter(Boolean);
+    }, [invoice, groupedSpecimens]);
+
     const formattedDate = invoice.created_at
         ? format(new Date(invoice.created_at), "dd 'de' MMMM, yyyy - HH:mm", {
               locale: es,
@@ -165,6 +172,16 @@ export default function InvoiceViewSheet({
                                 description={`Emitida el ${formattedDate}`}
                             />
                         </div>
+                        {specimenIdsForStickers.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                <StickerPrintDropdown
+                                    specimenIds={specimenIdsForStickers}
+                                    variant="outline"
+                                    size="sm"
+                                    label="Imprimir Stickers"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {/* Content Grid */}
@@ -693,14 +710,29 @@ export default function InvoiceViewSheet({
                                                                     #{idx + 1}
                                                                 </span>
                                                                 {spec.sequence_code && (
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className="border-blue-500/30 bg-blue-500/10 font-mono text-xs font-bold text-blue-700 dark:text-blue-300"
-                                                                    >
-                                                                        {
-                                                                            spec.sequence_code
-                                                                        }
-                                                                    </Badge>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <Badge
+                                                                            variant="outline"
+                                                                            className="border-blue-500/30 bg-blue-500/10 font-mono text-xs font-bold text-blue-700 dark:text-blue-300"
+                                                                        >
+                                                                            {
+                                                                                spec.sequence_code
+                                                                            }
+                                                                        </Badge>
+                                                                        {spec.id && (
+                                                                            <StickerPrintDropdown
+                                                                                specimenId={
+                                                                                    spec.id
+                                                                                }
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                showLabel={
+                                                                                    false
+                                                                                }
+                                                                                className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                                                            />
+                                                                        )}
+                                                                    </div>
                                                                 )}
                                                                 <span className="text-xs font-semibold text-foreground">
                                                                     {spec.type

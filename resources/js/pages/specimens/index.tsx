@@ -347,7 +347,13 @@ export default function SpecimensIndex({
 
     const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
     const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('search') || (filters as any)?.search || '';
+        }
+        return (filters as any)?.search || '';
+    });
     const [visibleCounts, setVisibleCounts] = useState<Record<number, number>>(
         {},
     );
@@ -1025,6 +1031,29 @@ export default function SpecimensIndex({
                 // Clean the query parameters from URL to avoid re-triggering on fresh re-renders/navs
                 const newUrl = window.location.pathname;
                 window.history.replaceState({}, '', newUrl);
+            } else if (action === 'view' && specimenParam) {
+                // Fallback: If not in current priority subset, fetch directly and open view sheet
+                fetch(`/specimens/${encodeURIComponent(specimenParam)}`, {
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                })
+                    .then((res) => (res.ok ? res.json() : null))
+                    .then((fetched) => {
+                        if (fetched) {
+                            setIsSheetOpen(false);
+                            setSelectedSpecimen(null);
+                            setSelectedSpecimenForView(fetched);
+                            setIsViewSheetOpen(true);
+                            window.history.replaceState(
+                                {},
+                                '',
+                                window.location.pathname,
+                            );
+                        }
+                    })
+                    .catch(() => {});
             }
         }
     }, [priorities]);

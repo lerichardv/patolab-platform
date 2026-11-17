@@ -33,6 +33,7 @@ import type { CustomerOption } from '@/components/async-customer-combobox';
 import { DeliveryDatePreview } from '@/components/delivery-date-preview';
 import FormCombobox from '@/components/form-combobox';
 import HeadingSheet from '@/components/heading-sheet';
+import { QuickStickerButton } from '@/components/stickers';
 import SpecimenGroupInvoiceSummaryAlertDialog from '@/components/specimen-group-invoice-summary-alert-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -2330,17 +2331,44 @@ export default function SpecimenGroupForm({
                                                             {estimatedCodes[
                                                                 spec.client_id
                                                             ] && (
-                                                                <span className="inline-flex items-center rounded-md border border-sky-100 bg-sky-50 px-2 py-0.5 font-mono text-[10px] font-bold text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-400">
-                                                                    {!spec.isExisting &&
-                                                                        !spec.sequence_code &&
-                                                                        '*'}
-                                                                    {
-                                                                        estimatedCodes[
-                                                                            spec
-                                                                                .client_id
-                                                                        ]
-                                                                    }
-                                                                </span>
+                                                                <div className="inline-flex items-center gap-1">
+                                                                    <span className="inline-flex items-center rounded-md border border-sky-100 bg-sky-50 px-2 py-0.5 font-mono text-[10px] font-bold text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-400">
+                                                                        {!spec.isExisting &&
+                                                                            !spec.sequence_code &&
+                                                                            '*'}
+                                                                        {
+                                                                            estimatedCodes[
+                                                                                spec
+                                                                                    .client_id
+                                                                            ]
+                                                                        }
+                                                                    </span>
+                                                                    <QuickStickerButton
+                                                                        type="frasco"
+                                                                        specimenId={
+                                                                            spec.id
+                                                                        }
+                                                                        previewSpecimens={
+                                                                            !spec.id
+                                                                                ? [
+                                                                                      {
+                                                                                          sequence_code:
+                                                                                              estimatedCodes[
+                                                                                                  spec
+                                                                                                      .client_id
+                                                                                              ],
+                                                                                          customer_name:
+                                                                                              spec.customer_name,
+                                                                                      },
+                                                                                  ]
+                                                                                : undefined
+                                                                        }
+                                                                        title="Imprimir Sticker para Frasco (Zebra ZD620)"
+                                                                        size="icon"
+                                                                        variant="ghost"
+                                                                        className="h-5 w-5 text-sky-700 hover:bg-sky-100 hover:text-sky-900 dark:text-sky-400 dark:hover:bg-sky-900/30"
+                                                                    />
+                                                                </div>
                                                             )}
                                                         </div>
                                                         {pageProps.auth?.permissions?.includes(
