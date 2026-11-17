@@ -712,13 +712,14 @@ class SpecimenBalanceController extends Controller
 
                 if (! empty($validated['target_date'])) {
                     $targetDate = $validated['target_date'];
+                    $baseDate = $specimen->created_at ?? $specimen->received_at;
 
                     $currentInternalDate = $specimen->expected_internal_finalization_date?->format('Y-m-d')
-                        ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
+                        ?? Carbon::parse($baseDate)->format('Y-m-d');
                     $currentClientDate = $specimen->expected_finalization_date?->format('Y-m-d')
-                        ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
+                        ?? Carbon::parse($baseDate)->format('Y-m-d');
 
-                    $internWeekdays = WorkloadPressureCalculator::calculateWeekdays($specimen->created_at, $targetDate);
+                    $internWeekdays = WorkloadPressureCalculator::calculateWeekdays($baseDate, $targetDate);
 
                     // Calculate calendar day difference between current internal date and target date
                     $targetCarbon = Carbon::parse($targetDate)->startOfDay();
@@ -727,7 +728,7 @@ class SpecimenBalanceController extends Controller
 
                     // Shift customer date by the exact same number of calendar days
                     $newClientDate = Carbon::parse($currentClientDate)->addDays($calendarDaysDiff);
-                    $clientWeekdays = WorkloadPressureCalculator::calculateWeekdays($specimen->created_at, $newClientDate);
+                    $clientWeekdays = WorkloadPressureCalculator::calculateWeekdays($baseDate, $newClientDate);
 
                     $updateData['is_manual_delivery_date_intern_enabled'] = true;
                     $updateData['delivery_date_intern_unit'] = 'days';
@@ -810,12 +811,14 @@ class SpecimenBalanceController extends Controller
                     ];
 
                     if (in_array($action, ['move_date', 'both'], true) && ! empty($targetDate)) {
-                        $currentInternalDate = $specimen->expected_internal_finalization_date?->format('Y-m-d')
-                            ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
-                        $currentClientDate = $specimen->expected_finalization_date?->format('Y-m-d')
-                            ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
+                        $baseDate = $specimen->created_at ?? $specimen->received_at;
 
-                        $internWeekdays = WorkloadPressureCalculator::calculateWeekdays($specimen->created_at, $targetDate);
+                        $currentInternalDate = $specimen->expected_internal_finalization_date?->format('Y-m-d')
+                            ?? Carbon::parse($baseDate)->format('Y-m-d');
+                        $currentClientDate = $specimen->expected_finalization_date?->format('Y-m-d')
+                            ?? Carbon::parse($baseDate)->format('Y-m-d');
+
+                        $internWeekdays = WorkloadPressureCalculator::calculateWeekdays($baseDate, $targetDate);
 
                         // Calculate calendar day difference between current internal date and target date
                         $targetCarbon = Carbon::parse($targetDate)->startOfDay();
@@ -824,7 +827,7 @@ class SpecimenBalanceController extends Controller
 
                         // Shift customer date by the exact same number of calendar days
                         $newClientDate = Carbon::parse($currentClientDate)->addDays($calendarDaysDiff);
-                        $clientWeekdays = WorkloadPressureCalculator::calculateWeekdays($specimen->created_at, $newClientDate);
+                        $clientWeekdays = WorkloadPressureCalculator::calculateWeekdays($baseDate, $newClientDate);
 
                         $updateData['is_manual_delivery_date_intern_enabled'] = true;
                         $updateData['delivery_date_intern_unit'] = 'days';

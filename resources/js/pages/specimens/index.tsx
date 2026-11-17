@@ -232,9 +232,15 @@ export default function SpecimensIndex({
     const auth = props.auth || {};
     const flash = props.flash || {};
     const isMobile = useIsMobile();
+    const isAdmin = auth.user?.role?.slug === 'admin';
     const canManageStatus = Boolean(
-        auth.user?.role?.slug === 'admin' ||
-        auth.permissions?.includes('specimens.manage_status'),
+        isAdmin ||
+        auth.permissions?.includes('specimens.manage_status') ||
+        auth.permissions?.includes('specimens.manage_finalized_status'),
+    );
+    const canManageFinalizedStatus = Boolean(
+        isAdmin ||
+        auth.permissions?.includes('specimens.manage_finalized_status'),
     );
 
     const [priorities, setPriorities] = useState<Priority[]>(() =>
@@ -838,6 +844,14 @@ export default function SpecimensIndex({
     };
 
     const selectedSpecimens = getSelectedSpecimens();
+    const hasOnlyTerminalSelected =
+        selectedSpecimens.length > 0 &&
+        selectedSpecimens.every((s) =>
+            ['finalized', 'delivered', 'cancelled'].includes(s.status),
+        );
+    const canBulkChangeStatus =
+        canManageFinalizedStatus ||
+        (canManageStatus && !hasOnlyTerminalSelected);
 
     const handleBulkChangeStatus = (status: string) => {
         router.post(
@@ -1853,7 +1867,11 @@ export default function SpecimensIndex({
                                         {/* Cambiar Estado Submenu */}
                                         {canManageStatus && (
                                             <DropdownMenuSub>
-                                                <DropdownMenuSubTrigger>
+                                                <DropdownMenuSubTrigger
+                                                    disabled={
+                                                        !canBulkChangeStatus
+                                                    }
+                                                >
                                                     <Tag className="mr-2 h-4 w-4" />
                                                     <span>Cambiar Estado</span>
                                                 </DropdownMenuSubTrigger>

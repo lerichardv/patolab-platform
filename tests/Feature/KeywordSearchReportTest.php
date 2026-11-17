@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Reports\KeywordSearchReportController;
 use App\Models\Customer;
 use App\Models\Permission;
 use App\Models\Priority;
@@ -290,4 +291,100 @@ test('preview data returns has_pdf true and pdf_url when report file exists', fu
     ]);
 
     expect($response->json('pdf_url'))->not->toBeNull();
+});
+
+test('parseSearchTerms correctly splits words and preserves quoted phrases', function () {
+    expect(KeywordSearchReportController::parseSearchTerms('márgenes libres'))
+        ->toBe(['márgenes', 'libres']);
+
+    expect(KeywordSearchReportController::parseSearchTerms('márgenes, libres; neoplasia'))
+        ->toBe(['márgenes', 'libres', 'neoplasia']);
+
+    expect(KeywordSearchReportController::parseSearchTerms('"márgenes quirúrgicos" neoplasia'))
+        ->toBe(['márgenes quirúrgicos', 'neoplasia']);
+
+    expect(KeywordSearchReportController::parseSearchTerms('   '))
+        ->toBe([]);
+});
+
+test('stream returns matching specimen when non-consecutive words are passed in the same field', function () {
+    // Report has: '<p>Los márgenes quirúrgicos se encuentran libres de neoplasia maligna.</p>'
+    // Search words: 'márgenes neoplasia' (separated by 5 words)
+    $response = $this->actingAs($this->user)->get(route('reports.keywords.stream', [
+        'search' => 'márgenes neoplasia',
+    ]));
+
+    $response->assertStatus(200);
+    $content = $response->streamedContent();
+
+    expect($content)->toContain('"type":"result"')
+        ->and($content)->toContain('BX-5345-09-2026')
+        ->and($content)->toContain('márgenes')
+        ->and($content)->toContain('neoplasia')
+        ->and($content)->toContain('Microscopía')
+        ->and($content)->toContain('"type":"done"');
+});
+
+test('stream returns matching specimen when search words are in reverse order of the report text', function () {
+    // Search words in reverse order: 'maligna márgenes'
+    $response = $this->actingAs($this->user)->get(route('reports.keywords.stream', [
+        'search' => 'maligna márgenes',
+    ]));
+
+    $response->assertStatus(200);
+    $content = $response->streamedContent();
+
+    expect($content)->toContain('"type":"result"')
+        ->and($content)->toContain('BX-5345-09-2026')
+        ->and($content)->toContain('"type":"done"');
+});
+
+test('stream returns matching specimen when search words match across different fields', function () {
+    // 'Adenocarcinoma' is in report diagnosis_html, 'Sigmoide' is in specimen anatomic_site
+    $response = $this->actingAs($this->user)->get(route('reports.keywords.stream', [
+        'search' => 'Adenocarcinoma Sigmoide',
+    ]));
+
+    $response->assertStatus(200);
+    $content = $response->streamedContent();
+
+    expect($content)->toContain('"type":"result"')
+        ->and($content)->toContain('BX-5345-09-2026')
+        ->and($content)->toContain('"type":"done"');
+});
+
+test('stream matches keywords with or without accents', function () {
+    // 'margenes' without accent matching 'márgenes'
+    $response = $this->actingAs($this->user)->get(route('reports.keywords.stream', [
+        'search' => 'margenes neoplasia',
+    ]));
+
+    $response->assertStatus(200);
+    $content = $response->streamedContent();
+
+    expect($content)->toContain('"type":"result"')
+        ->and($content)->toContain('BX-5345-09-2026')
+        ->and($content)->toContain('"type":"done"');
+});
+
+test('stream excludes specimen when at least one searched word does not match', function () {
+    // 'márgenes' exists, but 'melanoma' does NOT exist anywhere in this specimen
+    $response = $this->actingAs($this->user)->get(route('reports.keywords.stream', [
+        'search' => 'márgenes melanoma',
+    ]));
+
+    $response->assertStatus(200);
+    $content = $response->streamedContent();
+
+    expect($content)->not->toContain('BX-5345-09-2026')
+        ->and($content)->toContain('"total":0');
+});
+
+test('export works with non-consecutive multi-word keyword search', function () {
+    $response = $this->actingAs($this->user)->get(route('reports.keywords.export', [
+        'search' => 'márgenes neoplasia',
+    ]));
+
+    $response->assertStatus(200);
+    $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 });

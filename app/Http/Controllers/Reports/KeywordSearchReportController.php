@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -446,8 +447,10 @@ class KeywordSearchReportController extends Controller
 
         // Search term filter
         if ($request->filled('search')) {
-            $term = trim((string) $request->get('search'));
-            if ($term !== '') {
+            $search = (string) $request->get('search');
+            $terms = self::parseSearchTerms($search);
+
+            foreach ($terms as $term) {
                 $query->where(function ($q) use ($term) {
                     $q->where('sequence_code', 'like', "%{$term}%")
                         ->orWhere('anatomic_site', 'like', "%{$term}%")
@@ -459,6 +462,15 @@ class KeywordSearchReportController extends Controller
                         })
                         ->orWhereHas('invoiceRelation', function ($iq) use ($term) {
                             $iq->where('invoice_number', 'like', "%{$term}%");
+                        })
+                        ->orWhereHas('type', function ($tq) use ($term) {
+                            $tq->where('name', 'like', "%{$term}%");
+                        })
+                        ->orWhereHas('specimenExaminations.examination', function ($eq) use ($term) {
+                            $eq->where('name', 'like', "%{$term}%");
+                        })
+                        ->orWhereHas('examination', function ($eq) use ($term) {
+                            $eq->where('name', 'like', "%{$term}%");
                         })
                         ->orWhereHas('report', function ($rq) use ($term) {
                             $rq->where('microscopy_html', 'like', "%{$term}%")
@@ -478,6 +490,32 @@ class KeywordSearchReportController extends Controller
         $query->orderBy('created_at', 'desc');
 
         return $query;
+    }
+
+    /**
+     * Parse raw search query into individual search tokens or quoted phrases.
+     *
+     * @return string[]
+     */
+    public static function parseSearchTerms(string $search): array
+    {
+        $search = trim($search);
+        if ($search === '') {
+            return [];
+        }
+
+        $terms = [];
+        if (preg_match_all('/"([^"]+)"|(\S+)/u', $search, $matches)) {
+            foreach ($matches[0] as $index => $match) {
+                $term = ! empty($matches[1][$index]) ? $matches[1][$index] : $matches[2][$index];
+                $term = trim($term, " \t\n\r\0\x0B,;");
+                if ($term !== '') {
+                    $terms[] = $term;
+                }
+            }
+        }
+
+        return array_values(array_unique($terms));
     }
 
     /**
@@ -541,9 +579,11 @@ class KeywordSearchReportController extends Controller
     /**
      * Extract context snippet around the search term.
      */
-    private function extractContextSnippet(Specimen $specimen, string $term): array
+    private function extractContextSnippet(Specimen $specimen, string $search): array
     {
-        if (empty($term)) {
+        $terms = self::parseSearchTerms($search);
+
+        if (empty($terms)) {
             // If no term, provide a general clinical excerpt
             $diagnosis = $specimen->report?->diagnosis_html
                 ?: ($specimen->diagnosis ?: $specimen->clinical_notes);
@@ -572,6 +612,11 @@ class KeywordSearchReportController extends Controller
             ['content' => $specimen->sequence_code, 'field' => 'Código'],
         ];
 
+        $bestField = null;
+        $maxMatches = 0;
+        $bestMatches = [];
+        $bestText = '';
+
         foreach ($fieldsToCheck as $check) {
             $raw = (string) $check['content'];
             if (empty($raw)) {
@@ -580,29 +625,97 @@ class KeywordSearchReportController extends Controller
 
             $cleanText = html_entity_decode(strip_tags($raw), ENT_QUOTES | ENT_HTML5, 'UTF-8');
             $cleanText = trim(preg_replace('/\s+/', ' ', $cleanText));
+            if ($cleanText === '') {
+                continue;
+            }
 
-            $pos = mb_stripos($cleanText, $term, 0, 'UTF-8');
-            if ($pos !== false) {
+            $asciiCleanText = Str::ascii($cleanText);
+            $fieldMatches = [];
+
+            foreach ($terms as $t) {
+                $pos = mb_stripos($cleanText, $t, 0, 'UTF-8');
+                if ($pos === false) {
+                    $pos = mb_stripos($asciiCleanText, Str::ascii($t), 0, 'UTF-8');
+                }
+
+                if ($pos !== false) {
+                    $fieldMatches[] = [
+                        'pos' => $pos,
+                        'len' => mb_strlen($t, 'UTF-8'),
+                        'term' => $t,
+                    ];
+                }
+            }
+
+            $uniqueMatched = count(array_unique(array_column($fieldMatches, 'term')));
+
+            if ($uniqueMatched > $maxMatches) {
+                $maxMatches = $uniqueMatched;
+                $bestField = $check['field'];
+                $bestMatches = $fieldMatches;
+                $bestText = $cleanText;
+
+                // If all terms matched in this field, we can stop early
+                if ($uniqueMatched === count($terms)) {
+                    break;
+                }
+            }
+        }
+
+        if ($bestField !== null && $maxMatches > 0) {
+            usort($bestMatches, fn ($a, $b) => $a['pos'] <=> $b['pos']);
+
+            $firstPos = $bestMatches[0]['pos'];
+            $lastMatch = end($bestMatches);
+            $lastPos = $lastMatch['pos'] + $lastMatch['len'];
+            $span = $lastPos - $firstPos;
+
+            if ($span <= 200) {
                 $radius = 50;
-                $start = max(0, $pos - $radius);
-                $length = mb_strlen($term, 'UTF-8') + ($radius * 2);
-                $snippet = mb_substr($cleanText, $start, $length, 'UTF-8');
+                $start = max(0, $firstPos - $radius);
+                $end = min(mb_strlen($bestText, 'UTF-8'), $lastPos + $radius);
+                $snippet = mb_substr($bestText, $start, $end - $start, 'UTF-8');
 
                 $prefix = $start > 0 ? '... ' : '';
-                $suffix = ($start + $length) < mb_strlen($cleanText, 'UTF-8') ? ' ...' : '';
+                $suffix = $end < mb_strlen($bestText, 'UTF-8') ? ' ...' : '';
 
                 $cleanSnippet = $prefix.trim($snippet).$suffix;
 
                 return [
                     $cleanSnippet,
                     $cleanSnippet,
-                    $check['field'],
+                    $bestField,
                 ];
             }
+
+            $radius = 60;
+            $start = max(0, $firstPos - $radius);
+            $length = $bestMatches[0]['len'] + ($radius * 2);
+            $snippet = mb_substr($bestText, $start, $length, 'UTF-8');
+
+            $prefix = $start > 0 ? '... ' : '';
+            $suffix = ($start + $length) < mb_strlen($bestText, 'UTF-8') ? ' ...' : '';
+
+            $cleanSnippet = $prefix.trim($snippet).$suffix;
+
+            return [
+                $cleanSnippet,
+                $cleanSnippet,
+                $bestField,
+            ];
         }
 
-        // Fallback if not directly matched in stripped text (e.g. whitespace differences)
-        return ['... '.$term.' ...', $term, 'Coincidencia'];
+        // Fallback: general clinical excerpt if no checked field matched
+        $fallbackExcerpt = $specimen->report?->diagnosis_html
+            ?: ($specimen->diagnosis ?: $specimen->clinical_notes);
+        if (! empty($fallbackExcerpt)) {
+            $clean = trim(preg_replace('/\s+/', ' ', strip_tags(html_entity_decode((string) $fallbackExcerpt, ENT_QUOTES | ENT_HTML5, 'UTF-8'))));
+            $short = mb_substr($clean, 0, 100, 'UTF-8').(mb_strlen($clean) > 100 ? '...' : '');
+
+            return [$short ?: 'Sin observaciones registradas', $short ?: 'Sin observaciones registradas', 'General'];
+        }
+
+        return ['Sin observaciones registradas', 'Sin observaciones registradas', 'General'];
     }
 
     /**

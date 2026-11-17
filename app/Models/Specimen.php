@@ -234,7 +234,7 @@ class Specimen extends Model
 
     public function getExpectedFinalizationDateAttribute(): ?Carbon
     {
-        $baseDate = $this->received_at ?? $this->created_at;
+        $baseDate = $this->created_at ?? $this->received_at;
         if (! $baseDate) {
             return null;
         }
@@ -291,7 +291,7 @@ class Specimen extends Model
 
     public function getExpectedInternalFinalizationDateAttribute(): ?Carbon
     {
-        $baseDate = $this->received_at ?? $this->created_at;
+        $baseDate = $this->created_at ?? $this->received_at;
         if (! $baseDate) {
             return null;
         }

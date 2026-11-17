@@ -194,10 +194,10 @@ class SpecimenStatusService
         $user = $options['user'] ?? auth()->user();
         $requiresReport = $specimen->type ? (bool) $specimen->type->requires_report : true;
 
-        if (in_array($specimen->status, ['finalized', 'delivered']) && $targetStatus !== $specimen->status) {
-            if ($user && ! $user->can('specimens.manage_status')) {
+        if (in_array($specimen->status, ['finalized', 'delivered', 'cancelled']) && $targetStatus !== $specimen->status) {
+            if ($user && ! $user->can('specimens.manage_finalized_status')) {
                 throw ValidationException::withMessages([
-                    'status' => ['No tienes permiso para modificar el estado de una muestra finalizada o entregada.'],
+                    'status' => ['No tienes permiso para modificar el estado de una muestra finalizada, entregada o cancelada.'],
                 ]);
             }
         }

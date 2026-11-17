@@ -503,18 +503,26 @@ test('creating report from report editor advances specimen from received to next
     expect($specimen->status)->toBe('processing');
 });
 
-test('modifying finalized or delivered specimen requires specimens.manage_status permission', function () {
-    $perm = Permission::firstOrCreate(
+test('modifying finalized or delivered specimen requires specimens.manage_finalized_status permission', function () {
+    $permManageStatus = Permission::firstOrCreate(
         ['slug' => 'specimens.manage_status'],
         ['name' => 'Gestionar Estado de Muestras']
+    );
+    $permFinalizedStatus = Permission::firstOrCreate(
+        ['slug' => 'specimens.manage_finalized_status'],
+        ['name' => 'Gestionar Estado de Muestras Finalizadas/Entregadas']
     );
 
     $roleWithout = Role::create(['name' => 'Staff Regular', 'slug' => 'staff_regular']);
     $userWithout = User::factory()->create(['role_id' => $roleWithout->id]);
 
-    $roleWith = Role::create(['name' => 'Supervisor Status', 'slug' => 'supervisor_status']);
-    $roleWith->permissions()->attach($perm->id);
-    $userWith = User::factory()->create(['role_id' => $roleWith->id]);
+    $roleWithManageStatus = Role::create(['name' => 'User Manage Status', 'slug' => 'user_manage_status']);
+    $roleWithManageStatus->permissions()->attach($permManageStatus->id);
+    $userWithManageStatus = User::factory()->create(['role_id' => $roleWithManageStatus->id]);
+
+    $roleWithFinalized = Role::create(['name' => 'Supervisor Finalized Status', 'slug' => 'supervisor_finalized_status']);
+    $roleWithFinalized->permissions()->attach($permFinalizedStatus->id);
+    $userWithFinalized = User::factory()->create(['role_id' => $roleWithFinalized->id]);
 
     $type = SpecimenType::create(['name' => 'Biopsia Perms', 'active' => true]);
     $type->states()->create(['status' => 'received', 'step_order' => 1, 'active' => true]);
@@ -539,12 +547,16 @@ test('modifying finalized or delivered specimen requires specimens.manage_status
 
     $service = app(SpecimenStatusService::class);
 
-    // User without manage_status cannot transition a finalized specimen
+    // User without any status permission cannot transition a finalized specimen
     expect(fn () => $service->transition($specimen, 'processing', ['user' => $userWithout]))
         ->toThrow(ValidationException::class);
 
-    // User with manage_status can transition a finalized specimen
-    $updated = $service->transition($specimen, 'processing', ['user' => $userWith]);
+    // User with only specimens.manage_status cannot transition a finalized specimen
+    expect(fn () => $service->transition($specimen, 'processing', ['user' => $userWithManageStatus]))
+        ->toThrow(ValidationException::class);
+
+    // User with specimens.manage_finalized_status can transition a finalized specimen
+    $updated = $service->transition($specimen, 'processing', ['user' => $userWithFinalized]);
     expect($updated->status)->toBe('processing');
 });
 
@@ -710,4 +722,177 @@ test('bulkAction change_status succeeds when user has specimens.manage_status pe
 
     $specimen->refresh();
     expect($specimen->status)->toBe('processing');
+});
+
+test('user with only manage_status cannot update finalized specimen on quickUpdate', function () {
+    $role = Role::create(['name' => 'Editor Base Status', 'slug' => 'editor_base_status']);
+    $permEdit = Permission::firstOrCreate(['slug' => 'specimens.edit'], ['name' => 'Editar Muestras']);
+    $permManageStatus = Permission::firstOrCreate(['slug' => 'specimens.manage_status'], ['name' => 'Gestionar Estado']);
+    $role->permissions()->attach([$permEdit->id, $permManageStatus->id]);
+
+    $user = User::factory()->create(['role_id' => $role->id]);
+
+    $type = SpecimenType::create(['name' => 'Biopsia Quick Fin Ignored', 'active' => true]);
+    $type->states()->create(['status' => 'received', 'step_order' => 1, 'active' => true]);
+    $type->states()->create(['status' => 'processing', 'step_order' => 2, 'active' => true]);
+    $type->states()->create(['status' => 'finalized', 'step_order' => 3, 'active' => true]);
+
+    $priority = Priority::create(['name' => 'Prio Quick Fin', 'order' => 1, 'color' => '#000000']);
+    $customer = Customer::factory()->create();
+    $category = SpecimenCategory::create(['name' => 'Cat Quick Fin', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Médico Quick Fin', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Dr. Quick Fin', 'referrer_type' => $referrerType->id, 'active' => true]);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'TEST-QUICK-FIN-IGN-2026',
+        'status' => 'finalized',
+        'specimen_type' => $type->id,
+        'customer' => $customer->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+    ]);
+
+    $this->actingAs($user)->post(route('specimens.quick-update', $specimen->id), [
+        'referrer' => $referrer->id,
+        'specimen_category' => $category->id,
+        'priority_id' => $priority->id,
+        'status' => 'processing',
+    ]);
+
+    $specimen->refresh();
+    // Status change must be IGNORED because user lacks specimens.manage_finalized_status
+    expect($specimen->status)->toBe('finalized');
+});
+
+test('user with manage_finalized_status can update finalized specimen on quickUpdate', function () {
+    $role = Role::create(['name' => 'Editor Fin Allowed', 'slug' => 'editor_fin_allowed']);
+    $permEdit = Permission::firstOrCreate(['slug' => 'specimens.edit'], ['name' => 'Editar Muestras']);
+    $permFinalized = Permission::firstOrCreate(['slug' => 'specimens.manage_finalized_status'], ['name' => 'Gestionar Estado Finalizadas']);
+    $role->permissions()->attach([$permEdit->id, $permFinalized->id]);
+
+    $user = User::factory()->create(['role_id' => $role->id]);
+
+    $type = SpecimenType::create(['name' => 'Biopsia Quick Fin Allowed', 'active' => true]);
+    $type->states()->create(['status' => 'received', 'step_order' => 1, 'active' => true]);
+    $type->states()->create(['status' => 'processing', 'step_order' => 2, 'active' => true]);
+    $type->states()->create(['status' => 'finalized', 'step_order' => 3, 'active' => true]);
+
+    $priority = Priority::create(['name' => 'Prio Quick Fin Ok', 'order' => 1, 'color' => '#000000']);
+    $customer = Customer::factory()->create();
+    $category = SpecimenCategory::create(['name' => 'Cat Quick Fin Ok', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Médico Quick Fin Ok', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Dr. Quick Fin Ok', 'referrer_type' => $referrerType->id, 'active' => true]);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'TEST-QUICK-FIN-OK-2026',
+        'status' => 'finalized',
+        'specimen_type' => $type->id,
+        'customer' => $customer->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+    ]);
+
+    $this->actingAs($user)->post(route('specimens.quick-update', $specimen->id), [
+        'referrer' => $referrer->id,
+        'specimen_category' => $category->id,
+        'priority_id' => $priority->id,
+        'status' => 'processing',
+    ]);
+
+    $specimen->refresh();
+    // Status change succeeded!
+    expect($specimen->status)->toBe('processing');
+});
+
+test('bulkAction with only manage_status updates normal specimens but skips finalized specimens', function () {
+    $role = Role::create(['name' => 'Editor Bulk Base', 'slug' => 'editor_bulk_base']);
+    $permManageStatus = Permission::firstOrCreate(['slug' => 'specimens.manage_status'], ['name' => 'Gestionar Estado']);
+    $role->permissions()->attach($permManageStatus->id);
+
+    $user = User::factory()->create(['role_id' => $role->id]);
+
+    $type = SpecimenType::create(['name' => 'Biopsia Bulk Skip Fin', 'active' => true]);
+    $type->states()->create(['status' => 'received', 'step_order' => 1, 'active' => true]);
+    $type->states()->create(['status' => 'processing', 'step_order' => 2, 'active' => true]);
+    $type->states()->create(['status' => 'finalized', 'step_order' => 3, 'active' => true]);
+
+    $priority = Priority::create(['name' => 'Prio Bulk Skip', 'order' => 1, 'color' => '#000000']);
+    $customer = Customer::factory()->create();
+    $category = SpecimenCategory::create(['name' => 'Cat Bulk Skip', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Médico Bulk Skip', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Dr. Bulk Skip', 'referrer_type' => $referrerType->id, 'active' => true]);
+
+    $specimenReceived = Specimen::create([
+        'sequence_code' => 'TEST-BULK-REC-2026',
+        'status' => 'received',
+        'specimen_type' => $type->id,
+        'customer' => $customer->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+    ]);
+
+    $specimenFinalized = Specimen::create([
+        'sequence_code' => 'TEST-BULK-FIN-2026',
+        'status' => 'finalized',
+        'specimen_type' => $type->id,
+        'customer' => $customer->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+    ]);
+
+    $this->actingAs($user)->post(route('specimens.bulk-action'), [
+        'ids' => [$specimenReceived->id, $specimenFinalized->id],
+        'action' => 'change_status',
+        'value' => 'processing',
+    ]);
+
+    $specimenReceived->refresh();
+    $specimenFinalized->refresh();
+
+    // Received specimen was updated to processing
+    expect($specimenReceived->status)->toBe('processing');
+    // Finalized specimen was SKIPPED because user lacks specimens.manage_finalized_status
+    expect($specimenFinalized->status)->toBe('finalized');
+});
+
+test('bulkAction with manage_finalized_status can update finalized specimens', function () {
+    $role = Role::create(['name' => 'Editor Bulk Fin Allowed', 'slug' => 'editor_bulk_fin_allowed']);
+    $permFinalized = Permission::firstOrCreate(['slug' => 'specimens.manage_finalized_status'], ['name' => 'Gestionar Estado Finalizadas']);
+    $role->permissions()->attach($permFinalized->id);
+
+    $user = User::factory()->create(['role_id' => $role->id]);
+
+    $type = SpecimenType::create(['name' => 'Biopsia Bulk Fin Allowed', 'active' => true]);
+    $type->states()->create(['status' => 'received', 'step_order' => 1, 'active' => true]);
+    $type->states()->create(['status' => 'processing', 'step_order' => 2, 'active' => true]);
+    $type->states()->create(['status' => 'finalized', 'step_order' => 3, 'active' => true]);
+
+    $priority = Priority::create(['name' => 'Prio Bulk Fin Allowed', 'order' => 1, 'color' => '#000000']);
+    $customer = Customer::factory()->create();
+    $category = SpecimenCategory::create(['name' => 'Cat Bulk Fin Allowed', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Médico Bulk Fin Allowed', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Dr. Bulk Fin Allowed', 'referrer_type' => $referrerType->id, 'active' => true]);
+
+    $specimenFinalized = Specimen::create([
+        'sequence_code' => 'TEST-BULK-FIN-OK-2026',
+        'status' => 'finalized',
+        'specimen_type' => $type->id,
+        'customer' => $customer->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+    ]);
+
+    $this->actingAs($user)->post(route('specimens.bulk-action'), [
+        'ids' => [$specimenFinalized->id],
+        'action' => 'change_status',
+        'value' => 'processing',
+    ]);
+
+    $specimenFinalized->refresh();
+    expect($specimenFinalized->status)->toBe('processing');
 });

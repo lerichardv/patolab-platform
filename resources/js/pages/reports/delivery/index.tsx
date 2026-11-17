@@ -49,7 +49,11 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { formatUnitSpanish } from '@/services/specimen-delivery-date';
+import {
+    formatUnitSpanish,
+    getEstimatedDate,
+    getClientEstimatedDate,
+} from '@/services/specimen-delivery-date';
 import SpecimenViewSheet from '../../specimens/specimen-view-sheet';
 
 interface ExaminationItem {
@@ -95,6 +99,7 @@ interface SpecimenReportRow {
         };
     }[];
     created_at: string;
+    received_at?: string | null;
     expected_internal_finalization_date: string | null;
     expected_finalization_date: string | null;
     finalized_at: string | null;
@@ -1128,24 +1133,39 @@ export default function DeliveryReportIndex({
                                                         },
                                                     ]
                                                   : [];
+                                        const estimatedInternal =
+                                            getEstimatedDate(row);
+                                        const estimatedDelivery =
+                                            getClientEstimatedDate(row);
+
                                         const expectedInternal =
-                                            row.expected_internal_finalization_date
+                                            estimatedInternal
                                                 ? format(
-                                                      new Date(
-                                                          row.expected_internal_finalization_date,
-                                                      ),
+                                                      estimatedInternal,
                                                       'd/M/yy',
                                                   )
-                                                : 'N/A';
+                                                : row.expected_internal_finalization_date
+                                                  ? format(
+                                                        new Date(
+                                                            row.expected_internal_finalization_date,
+                                                        ),
+                                                        'd/M/yy',
+                                                    )
+                                                  : 'N/A';
                                         const expectedDelivery =
-                                            row.expected_finalization_date
+                                            estimatedDelivery
                                                 ? format(
-                                                      new Date(
-                                                          row.expected_finalization_date,
-                                                      ),
+                                                      estimatedDelivery,
                                                       'd/M/yy',
                                                   )
-                                                : 'N/A';
+                                                : row.expected_finalization_date
+                                                  ? format(
+                                                        new Date(
+                                                            row.expected_finalization_date,
+                                                        ),
+                                                        'd/M/yy',
+                                                    )
+                                                  : 'N/A';
                                         const finalizedAtFormatted =
                                             row.finalized_at
                                                 ? format(

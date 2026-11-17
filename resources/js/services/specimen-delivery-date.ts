@@ -102,17 +102,39 @@ export function getClientDeliveryDuration(
  * Calculates the internal estimated finalization date for a specimen.
  */
 export function getEstimatedDate(specimen: any): Date | null {
-    if (!specimen || !specimen.created_at) {
+    if (!specimen) {
         return null;
     }
 
     const duration = getInternalDeliveryDuration(specimen);
 
     if (!duration) {
+        if (specimen.expected_internal_finalization_date) {
+            const parsed = new Date(
+                specimen.expected_internal_finalization_date,
+            );
+
+            return isNaN(parsed.getTime()) ? null : parsed;
+        }
+
         return null;
     }
 
-    const createdAt = new Date(specimen.created_at);
+    const baseDate = specimen.created_at || specimen.received_at;
+
+    if (!baseDate) {
+        if (specimen.expected_internal_finalization_date) {
+            const parsed = new Date(
+                specimen.expected_internal_finalization_date,
+            );
+
+            return isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        return null;
+    }
+
+    const createdAt = new Date(baseDate);
 
     return addDeliveryDuration(createdAt, duration.quantity, duration.unit);
 }
@@ -121,17 +143,35 @@ export function getEstimatedDate(specimen: any): Date | null {
  * Calculates the customer-facing estimated delivery date for a specimen.
  */
 export function getClientEstimatedDate(specimen: any): Date | null {
-    if (!specimen || !specimen.created_at) {
+    if (!specimen) {
         return null;
     }
 
     const duration = getClientDeliveryDuration(specimen);
 
     if (!duration) {
+        if (specimen.expected_finalization_date) {
+            const parsed = new Date(specimen.expected_finalization_date);
+
+            return isNaN(parsed.getTime()) ? null : parsed;
+        }
+
         return null;
     }
 
-    const createdAt = new Date(specimen.created_at);
+    const baseDate = specimen.created_at || specimen.received_at;
+
+    if (!baseDate) {
+        if (specimen.expected_finalization_date) {
+            const parsed = new Date(specimen.expected_finalization_date);
+
+            return isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        return null;
+    }
+
+    const createdAt = new Date(baseDate);
 
     return addDeliveryDuration(createdAt, duration.quantity, duration.unit);
 }
@@ -187,7 +227,9 @@ export function formatDurationText(
  * Returns the effective due date for a specimen (prioritizes internal over client delivery).
  */
 export function getSpecimenDueDate(specimen: any): Date {
-    const createdAt = new Date(specimen?.created_at || Date.now());
+    const baseDate =
+        specimen?.created_at || specimen?.received_at || Date.now();
+    const createdAt = new Date(baseDate);
 
     const internalDuration = getInternalDeliveryDuration(specimen);
 
@@ -229,7 +271,8 @@ export function getSpecimenDueDateInfo(specimen: any): DueDateInfo | null {
         return null;
     }
 
-    const createdAt = new Date(specimen.created_at || Date.now());
+    const baseDate = specimen.created_at || specimen.received_at || Date.now();
+    const createdAt = new Date(baseDate);
     const dueDate = addDeliveryDuration(
         createdAt,
         duration.quantity,

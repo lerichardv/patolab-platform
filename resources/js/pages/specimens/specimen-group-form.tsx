@@ -145,9 +145,19 @@ export default function SpecimenGroupForm({
     banks = [],
 }: Props) {
     const { props: pageProps } = usePage<any>();
+    const isAdmin = pageProps.auth?.user?.role?.slug === 'admin';
     const canManageStatus = Boolean(
-        pageProps.auth?.user?.role?.slug === 'admin' ||
-        pageProps.auth?.permissions?.includes('specimens.manage_status'),
+        isAdmin ||
+        pageProps.auth?.permissions?.includes('specimens.manage_status') ||
+        pageProps.auth?.permissions?.includes(
+            'specimens.manage_finalized_status',
+        ),
+    );
+    const canManageFinalizedStatus = Boolean(
+        isAdmin ||
+        pageProps.auth?.permissions?.includes(
+            'specimens.manage_finalized_status',
+        ),
     );
     const { settings } = pageProps;
     const flash = pageProps.flash as Record<string, any> | undefined;
@@ -4666,36 +4676,65 @@ export default function SpecimenGroupForm({
                                 <Label htmlFor="nested_status">
                                     Estado Inicial
                                 </Label>
-                                <FormCombobox
-                                    placeholder="Seleccionar estado"
-                                    value={nestedStatus}
-                                    onChange={(v) => {
-                                        setNestedStatus(v);
-                                        setNestedErrors((prev) => ({
-                                            ...prev,
-                                            status: '',
-                                        }));
-                                    }}
-                                    disabled={!canManageStatus}
-                                    options={nestedAvailableStatuses.map(
-                                        (s, idx) => ({
-                                            label: s.label,
-                                            value: s.value,
-                                            color: s.color,
-                                            disabled: !nestedSpecimenToEditId
-                                                ? idx !== 0
-                                                : !canManageStatus
-                                                  ? nestedStatus !== s.value
-                                                  : false,
-                                        }),
-                                    )}
-                                />
-                                {!canManageStatus && (
-                                    <p className="text-xs text-muted-foreground">
-                                        El estado solo puede ser modificado por
-                                        roles autorizados.
-                                    </p>
-                                )}
+                                {(() => {
+                                    const currentNestedSpec =
+                                        nestedSpecimenToEditId
+                                            ? specimens.find(
+                                                  (s) =>
+                                                      s.client_id ===
+                                                      nestedSpecimenToEditId,
+                                              )
+                                            : null;
+                                    const isNestedTerminal = Boolean(
+                                        currentNestedSpec &&
+                                        [
+                                            'finalized',
+                                            'delivered',
+                                            'cancelled',
+                                        ].includes(currentNestedSpec.status),
+                                    );
+                                    const canEditNestedStatus = isNestedTerminal
+                                        ? canManageFinalizedStatus
+                                        : canManageStatus;
+
+                                    return (
+                                        <>
+                                            <FormCombobox
+                                                placeholder="Seleccionar estado"
+                                                value={nestedStatus}
+                                                onChange={(v) => {
+                                                    setNestedStatus(v);
+                                                    setNestedErrors((prev) => ({
+                                                        ...prev,
+                                                        status: '',
+                                                    }));
+                                                }}
+                                                disabled={!canEditNestedStatus}
+                                                options={nestedAvailableStatuses.map(
+                                                    (s, idx) => ({
+                                                        label: s.label,
+                                                        value: s.value,
+                                                        color: s.color,
+                                                        disabled:
+                                                            !nestedSpecimenToEditId
+                                                                ? idx !== 0
+                                                                : !canEditNestedStatus
+                                                                  ? nestedStatus !==
+                                                                    s.value
+                                                                  : false,
+                                                    }),
+                                                )}
+                                            />
+                                            {!canEditNestedStatus && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {isNestedTerminal
+                                                        ? 'El estado de muestras finalizadas, entregadas o canceladas solo puede ser modificado por roles autorizados.'
+                                                        : 'El estado solo puede ser modificado por roles autorizados.'}
+                                                </p>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                                 {nestedErrors.status && (
                                     <p className="text-xs text-destructive">
                                         {nestedErrors.status}

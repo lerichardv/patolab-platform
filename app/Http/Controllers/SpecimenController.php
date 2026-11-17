@@ -1016,7 +1016,12 @@ class SpecimenController extends Controller
             }
 
             if (isset($validated['status']) && $validated['status'] !== $specimen->status) {
-                if ($request->user() && $request->user()->can('specimens.manage_status')) {
+                $isTerminal = in_array($specimen->status, ['finalized', 'delivered', 'cancelled']);
+                $canEditStatus = $isTerminal
+                    ? ($request->user() && $request->user()->can('specimens.manage_finalized_status'))
+                    : ($request->user() && ($request->user()->can('specimens.manage_status') || $request->user()->can('specimens.manage_finalized_status')));
+
+                if ($canEditStatus) {
                     $statusService = app(SpecimenStatusService::class);
                     $statusService->transition($specimen, $validated['status'], [
                         'user' => $request->user(),
@@ -1772,7 +1777,9 @@ class SpecimenController extends Controller
         $cancellationReason = $validated['cancellation_reason'] ?? null;
 
         if ($action === 'change_status') {
-            Gate::authorize('specimens.manage_status');
+            if (! Gate::allows('specimens.manage_status') && ! Gate::allows('specimens.manage_finalized_status')) {
+                abort(403, 'No tienes permiso para modificar estados de muestras.');
+            }
         } elseif ($action === 'change_priority') {
             Gate::authorize('specimens.edit');
         } elseif (in_array($action, ['assign_pathologist', 'unassign_pathologist'])) {
@@ -1802,7 +1809,11 @@ class SpecimenController extends Controller
                 foreach ($ids as $id) {
                     $specimen = Specimen::find($id);
                     if ($specimen && $statusService->canTransitionTo($specimen, $value)) {
-                        if (in_array($specimen->status, ['finalized', 'delivered']) && $user && ! $user->can('specimens.manage_status')) {
+                        $isTerminal = in_array($specimen->status, ['finalized', 'delivered', 'cancelled']);
+                        if ($isTerminal && $user && ! $user->can('specimens.manage_finalized_status')) {
+                            continue;
+                        }
+                        if (! $isTerminal && $user && ! ($user->can('specimens.manage_status') || $user->can('specimens.manage_finalized_status'))) {
                             continue;
                         }
                         $statusService->transition($specimen, $value, [
@@ -2143,7 +2154,12 @@ class SpecimenController extends Controller
             }
 
             if (isset($validated['status']) && $validated['status'] !== $specimen->status) {
-                if ($request->user() && $request->user()->can('specimens.manage_status')) {
+                $isTerminal = in_array($specimen->status, ['finalized', 'delivered', 'cancelled']);
+                $canEditStatus = $isTerminal
+                    ? ($request->user() && $request->user()->can('specimens.manage_finalized_status'))
+                    : ($request->user() && ($request->user()->can('specimens.manage_status') || $request->user()->can('specimens.manage_finalized_status')));
+
+                if ($canEditStatus) {
                     $statusService = app(SpecimenStatusService::class);
                     $statusService->transition($specimen, $validated['status'], [
                         'user' => $request->user(),

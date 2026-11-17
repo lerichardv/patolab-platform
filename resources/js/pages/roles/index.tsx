@@ -193,10 +193,19 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Gestionar Estado de Muestras',
         description:
-            'Permite cambiar manualmente el estado de las muestras en los formularios, incluyendo muestras finalizadas o entregadas.',
+            'Permite cambiar manualmente el estado de las muestras que no se encuentren finalizadas, canceladas ni entregadas.',
         module: 'Operaciones del Laboratorio',
         slugs: {
             manage: 'specimens.manage_status',
+        },
+    },
+    {
+        label: 'Gestionar Muestras Finalizadas/Entregadas',
+        description:
+            'Permite modificar manualmente el estado de muestras que ya fueron finalizadas, entregadas o canceladas.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            manage: 'specimens.manage_finalized_status',
         },
     },
     {

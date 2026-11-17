@@ -14,6 +14,7 @@ use App\Models\SpecimenExamination;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -244,4 +245,52 @@ test('delivery report filters specimens using SpecimenExamination relationship',
         ->has('specimens.data', 1)
         ->where('specimens.data.0.id', $specimenWithoutLegacyCol->id)
     );
+});
+
+test('delivery report shows matching expected dates when specimen is rescheduled in specimen balance', function () {
+    Carbon::setTestNow('2026-09-09 15:18:00');
+
+    $balancePermission = Permission::firstOrCreate(
+        ['slug' => 'specimens_balance.manage'],
+        ['name' => 'Gestionar Balance']
+    );
+    $this->user->role->permissions()->syncWithoutDetaching([$balancePermission->id]);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'BX-5105-09-2026',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'received_at' => '2026-09-08 15:18:00',
+        'created_at' => '2026-09-09 15:18:00',
+    ]);
+
+    // Reschedule to 2026-10-30 in balance
+    $this->actingAs($this->user)
+        ->postJson(route('specimens-balance.reschedule', $specimen), [
+            'target_date' => '2026-10-30',
+            'reason' => 'Ajuste de carga de trabajo',
+        ])
+        ->assertSuccessful();
+
+    $specimen->refresh();
+
+    // Specimen expected dates must match the rescheduled internal target date
+    expect($specimen->expected_internal_finalization_date->format('Y-m-d'))->toBe('2026-10-30');
+
+    // Delivery report must return the exact expected dates when filtering by internal date or delivery date
+    $response = $this->actingAs($this->user)->get('/reports/delivery?internal_date_from=2026-10-30&internal_date_to=2026-10-30');
+    $response->assertStatus(200);
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('reports/delivery/index')
+        ->has('specimens.data', 1)
+        ->where('specimens.data.0.sequence_code', 'BX-5105-09-2026')
+        ->where('specimens.data.0.expected_internal_finalization_date', fn ($date) => str_starts_with((string) $date, '2026-10-30'))
+    );
+
+    Carbon::setTestNow();
 });

@@ -122,23 +122,82 @@ const getSpecimenTypeId = (exam: any): string | null => {
     return typeId ? typeId.toString() : null;
 };
 
+const parseSearchTokens = (term: string): string[] => {
+    if (!term || !term.trim()) {
+        return [];
+    }
+
+    const matches = term.match(/"([^"]+)"|(\S+)/g) || [];
+    const tokens: string[] = [];
+
+    for (const match of matches) {
+        const cleaned = match
+            .replace(/^"|"$/g, '')
+            .trim()
+            .replace(/^[,;.]+|[,;.]+$/g, '');
+
+        if (cleaned.length > 0) {
+            tokens.push(cleaned);
+        }
+    }
+
+    return Array.from(new Set(tokens)).sort((a, b) => b.length - a.length);
+};
+
+const makeAccentTolerantPattern = (str: string): string => {
+    const vowelMap: Record<string, string> = {
+        a: '[aáàäâAÁÀÄÂ]',
+        e: '[eéèëêEÉÈËÊ]',
+        i: '[iíìïîIÍÌÏÎ]',
+        o: '[oóòöôOÓÒÖÔ]',
+        u: '[uúùüûUÚÙÜÛ]',
+        n: '[nñNÑ]',
+    };
+
+    return str
+        .split('')
+        .map((char) => {
+            const lower = char
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+
+            if (vowelMap[lower]) {
+                return vowelMap[lower];
+            }
+
+            return char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        })
+        .join('');
+};
+
 const HighlightKeyword: React.FC<{ text: string; term: string }> = ({
     text,
     term,
 }) => {
+    if (!text) {
+        return null;
+    }
+
     if (!term || !term.trim()) {
         return <span>{text}</span>;
     }
 
-    const trimmedTerm = term.trim();
-    const escapedTerm = trimmedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(${escapedTerm})`, 'gi');
-    const parts = text.split(regex);
+    const tokens = parseSearchTokens(term);
+
+    if (tokens.length === 0) {
+        return <span>{text}</span>;
+    }
+
+    const pattern = tokens.map((t) => makeAccentTolerantPattern(t)).join('|');
+    const splitRegex = new RegExp(`(${pattern})`, 'gi');
+    const matchRegex = new RegExp(`^(?:${pattern})$`, 'i');
+    const parts = text.split(splitRegex);
 
     return (
         <span>
             {parts.map((part, i) =>
-                regex.test(part) ? (
+                part && matchRegex.test(part) ? (
                     <mark
                         key={i}
                         className="rounded bg-amber-200/90 px-1 py-0.5 font-semibold text-amber-950 dark:bg-amber-900/60 dark:text-amber-200"
@@ -656,7 +715,7 @@ export default function KeywordSearchReportPage({
                                             runSearch();
                                         }
                                     }}
-                                    placeholder="ej. márgenes, adenocarcinoma, positivo, necrosis, atipia..."
+                                    placeholder="ej. márgenes libres, adenocarcinoma colon, necrosis, atipia..."
                                     className="h-10 pr-9 pl-9"
                                 />
                                 {search && (

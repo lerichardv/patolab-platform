@@ -169,10 +169,27 @@ export default function SpecimenForm({
     const products = propProducts || formContext?.products || [];
     const banks = propBanks || formContext?.banks || [];
     const { props: pageProps } = usePage<any>();
+    const isAdmin = pageProps.auth?.user?.role?.slug === 'admin';
     const canManageStatus = Boolean(
-        pageProps.auth?.user?.role?.slug === 'admin' ||
-        pageProps.auth?.permissions?.includes('specimens.manage_status'),
+        isAdmin ||
+        pageProps.auth?.permissions?.includes('specimens.manage_status') ||
+        pageProps.auth?.permissions?.includes(
+            'specimens.manage_finalized_status',
+        ),
     );
+    const canManageFinalizedStatus = Boolean(
+        isAdmin ||
+        pageProps.auth?.permissions?.includes(
+            'specimens.manage_finalized_status',
+        ),
+    );
+    const isTerminalStatus = Boolean(
+        specimen &&
+        ['finalized', 'delivered', 'cancelled'].includes(specimen.status),
+    );
+    const canEditCurrentStatus = isTerminalStatus
+        ? canManageFinalizedStatus
+        : canManageStatus;
     const flash = pageProps.flash as Record<string, any> | undefined;
     const [availableTemplates, setAvailableTemplates] = React.useState<any[]>(
         [],
@@ -3388,7 +3405,7 @@ export default function SpecimenForm({
                                     placeholder="Seleccionar estado"
                                     value={data.status}
                                     onChange={(v) => setData('status', v)}
-                                    disabled={!canManageStatus}
+                                    disabled={!canEditCurrentStatus}
                                     options={availableStatuses.map(
                                         (s, idx) => ({
                                             label: s.label,
@@ -3396,16 +3413,17 @@ export default function SpecimenForm({
                                             color: s.color,
                                             disabled: !specimen
                                                 ? idx !== 0
-                                                : !canManageStatus
+                                                : !canEditCurrentStatus
                                                   ? data.status !== s.value
                                                   : false,
                                         }),
                                     )}
                                 />
-                                {!canManageStatus && (
+                                {!canEditCurrentStatus && (
                                     <p className="text-xs text-muted-foreground">
-                                        El estado solo puede ser modificado por
-                                        roles autorizados.
+                                        {isTerminalStatus
+                                            ? 'El estado de muestras finalizadas, entregadas o canceladas solo puede ser modificado por roles autorizados.'
+                                            : 'El estado solo puede ser modificado por roles autorizados.'}
                                     </p>
                                 )}
                                 {errors.status && (
