@@ -157,6 +157,16 @@ class PermissionsSeeder extends Seeder
 
             /*
             |--------------------------------------------------------------------------
+            | Laboratories
+            |--------------------------------------------------------------------------
+            */
+            ['name' => 'Ver Laboratorios', 'slug' => 'laboratories.view'],
+            ['name' => 'Crear Laboratorios', 'slug' => 'laboratories.create'],
+            ['name' => 'Editar Laboratorios', 'slug' => 'laboratories.edit'],
+            ['name' => 'Eliminar Laboratorios', 'slug' => 'laboratories.delete'],
+
+            /*
+            |--------------------------------------------------------------------------
             | Locations
             |--------------------------------------------------------------------------
             */

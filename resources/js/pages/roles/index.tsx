@@ -483,6 +483,18 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Laboratorios (Emisión de Stickers)',
+        description:
+            'Gestión de nombres de laboratorios impresos en los stickers.',
+        module: 'Administración de Muestras',
+        slugs: {
+            view: 'laboratories.view',
+            create: 'laboratories.create',
+            edit: 'laboratories.edit',
+            delete: 'laboratories.delete',
+        },
+    },
+    {
         label: 'Remitentes (Médicos/Clínicas)',
         description: 'Médicos referentes y orígenes de muestras.',
         module: 'Directorio y Ubicaciones',

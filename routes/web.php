@@ -305,8 +305,7 @@ Route::middleware(['auth:web', 'verified'])->group(function () {
     Route::post('stickers/cuttings', [StickerController::class, 'generateCuttingsPdf'])->name('stickers.cuttings');
 
     // Laboratories Management
-    Route::get('laboratories', [LaboratoryController::class, 'index'])->name('laboratories.index');
-    Route::post('laboratories', [LaboratoryController::class, 'store'])->name('laboratories.store');
+    Route::resource('laboratories', LaboratoryController::class)->except(['create', 'show', 'edit']);
 });
 
 // Route::get('/phpinfo', function () {

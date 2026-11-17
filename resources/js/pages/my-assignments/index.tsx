@@ -604,6 +604,9 @@ export default function MyAssignmentsIndex({
     const [stickerTargetSpecimenIds, setStickerTargetSpecimenIds] = useState<
         number[]
     >([]);
+    const [stickerTargetCuttings, setStickerTargetCuttings] = useState<any[]>(
+        [],
+    );
 
     const handleAdvanceStatus = (specimen: Specimen) => {
         setSpecimenToAdvance(specimen);
@@ -1697,6 +1700,7 @@ export default function MyAssignmentsIndex({
                                                 setStickerTargetSpecimenIds(
                                                     selectedIds,
                                                 );
+                                                setStickerTargetCuttings([]);
                                                 setStickerSheetType('casette');
                                                 setStickerSheetOpen(true);
                                             }}
@@ -1714,6 +1718,7 @@ export default function MyAssignmentsIndex({
                                                 setStickerTargetSpecimenIds(
                                                     selectedIds,
                                                 );
+                                                setStickerTargetCuttings([]);
                                                 setStickerSheetType('muestra');
                                                 setStickerSheetOpen(true);
                                             }}
@@ -2528,6 +2533,10 @@ export default function MyAssignmentsIndex({
                                                                                                     specimen.id,
                                                                                                 ],
                                                                                             );
+                                                                                            setStickerTargetCuttings(
+                                                                                                specimen.cuttings ||
+                                                                                                    [],
+                                                                                            );
                                                                                             setStickerSheetType(
                                                                                                 'muestra',
                                                                                             );
@@ -2551,6 +2560,10 @@ export default function MyAssignmentsIndex({
                                                                                                     specimen.id,
                                                                                                 ],
                                                                                             );
+                                                                                            setStickerTargetCuttings(
+                                                                                                specimen.cuttings ||
+                                                                                                    [],
+                                                                                            );
                                                                                             setStickerSheetType(
                                                                                                 'muestra',
                                                                                             );
@@ -2573,6 +2586,10 @@ export default function MyAssignmentsIndex({
                                                                                                 [
                                                                                                     specimen.id,
                                                                                                 ],
+                                                                                            );
+                                                                                            setStickerTargetCuttings(
+                                                                                                specimen.cuttings ||
+                                                                                                    [],
                                                                                             );
                                                                                             setStickerSheetType(
                                                                                                 'casette',
@@ -2870,7 +2887,8 @@ export default function MyAssignmentsIndex({
                 onOpenChange={setStickerSheetOpen}
                 initialType={stickerSheetType}
                 specimenIds={stickerTargetSpecimenIds}
-                autoStart={true}
+                cuttingsAvailable={stickerTargetCuttings}
+                autoStart={false}
             />
         </>
     );

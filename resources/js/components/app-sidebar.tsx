@@ -22,6 +22,7 @@ import {
     BarChart3,
     Calculator,
     CalendarDays,
+    Building2,
 } from 'lucide-react';
 import { index as caiRangesIndex } from '@/actions/App/Http/Controllers/CaiRangeController';
 import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
@@ -34,6 +35,7 @@ import { index as inventoryMovementsIndex } from '@/actions/App/Http/Controllers
 import { index as inventoryProvidersIndex } from '@/actions/App/Http/Controllers/InventoryProviderController';
 import { index as inventoryPurchaseOrdersIndex } from '@/actions/App/Http/Controllers/InventoryPurchaseOrderController';
 import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceController';
+import { index as laboratoriesIndex } from '@/actions/App/Http/Controllers/LaboratoryController';
 import { index as locationsIndex } from '@/actions/App/Http/Controllers/LocationController';
 import { index as myAssignmentsIndex } from '@/actions/App/Http/Controllers/MyAssignmentController';
 import { index as myWorkOrdersIndex } from '@/actions/App/Http/Controllers/MyWorkOrderController';
@@ -195,6 +197,12 @@ const adminNavItems: NavItem[] = [
                 href: customersIndex(),
                 icon: Contact,
                 permission: 'patients.view',
+            },
+            {
+                title: 'Laboratorios',
+                href: laboratoriesIndex(),
+                icon: Building2,
+                permission: 'laboratories.view',
             },
             {
                 title: 'Muestras',
